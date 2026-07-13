@@ -1,0 +1,84 @@
+<t-navbar title="流程卡填报" leftArrow />
+
+<view class="form-loading" wx:if="{{loading}}">
+  <t-loading theme="circular" size="40rpx" text="加载中..." />
+</view>
+
+<view class="form-page" wx:if="{{!loading && cardData}}">
+  <view class="form-card">
+    <view class="form-card__header">
+      <view class="form-card__title">{{cardData.prod_name}}</view>
+      <view class="form-card__lock">
+        <t-icon name="lock-on" size="32rpx" /> 已上锁
+      </view>
+    </view>
+    <view class="form-card__row"><text class="form-card__label">卡号</text><text class="form-card__value">{{cardData.card_no}}</text></view>
+    <view class="form-card__row"><text class="form-card__label">工段</text><text class="form-card__value">{{cardData.current_step}}</text></view>
+    <view class="form-card__row"><text class="form-card__label">状态</text><text class="form-card__value">{{cardData.status}}</text></view>
+    <view class="form-card__row"><text class="form-card__label">锁定人</text><text class="form-card__value">{{cardData.locked_by}}</text></view>
+  </view>
+
+  <view class="form-card" wx:if="{{fields.length > 0}}">
+    <view class="form-card__header">
+      <view class="form-card__title">{{stepName}}填报</view>
+    </view>
+
+    <block wx:for="{{fields}}" wx:key="field_name">
+      <t-input
+        wx:if="{{item.type === 'number' || item.type === 'text'}}"
+        label="{{item.displayLabel}}"
+        type="{{item.type === 'number' ? 'number' : 'text'}}"
+        value="{{formData[item.field_name]}}"
+        data-field="{{item.field_name}}"
+        placeholder="请输入"
+        bind:change="onInputChange" />
+
+      <view wx:if="{{item.type === 'textarea'}}" class="field-block">
+        <view class="field-block__label">{{item.displayLabel}}</view>
+        <t-textarea
+          value="{{formData[item.field_name]}}"
+          data-field="{{item.field_name}}"
+          placeholder="请输入"
+          autosize
+          bind:change="onInputChange" />
+      </view>
+
+      <view wx:if="{{item.type === 'radio'}}" class="field-block">
+        <view class="field-block__label">{{item.displayLabel}}</view>
+        <t-radio-group
+          value="{{formData[item.field_name]}}"
+          data-field="{{item.field_name}}"
+          bind:change="onInputChange">
+          <t-radio
+            wx:for="{{item.options}}"
+            wx:for-item="opt"
+            wx:key="*this"
+            value="{{opt}}"
+            label="{{opt}}" />
+        </t-radio-group>
+      </view>
+
+      <view wx:if="{{item.type === 'switch'}}" class="field-switch">
+        <view class="field-block__label">{{item.label}}</view>
+        <t-switch
+          value="{{formData[item.field_name]}}"
+          data-field="{{item.field_name}}"
+          bind:change="onInputChange" />
+      </view>
+    </block>
+  </view>
+
+  <view class="form-card" wx:if="{{fields.length === 0}}">
+    <view class="form-card__title">该工段暂无配置填报模板</view>
+  </view>
+
+  <view class="form-actions">
+    <t-button theme="primary" block size="large" bind:tap="submitAndUnlock" loading="{{submitting}}">提交并解锁</t-button>
+    <t-button theme="default" block bind:tap="cancelAndUnlock" disabled="{{submitting}}">放弃并解锁</t-button>
+  </view>
+</view>
+
+<view class="form-empty" wx:if="{{!loading && !cardData}}">
+  <t-empty description="未获取到流程卡数据，请重新扫码" />
+  <t-button theme="primary" bind:tap="goScan">去扫码</t-button>
+</view>

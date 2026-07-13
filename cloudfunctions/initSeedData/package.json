@@ -1,0 +1,9 @@
+{
+  "name": "initSeedData",
+  "version": "1.0.0",
+  "description": "初始化测试数据：质检模板与样例流程卡",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

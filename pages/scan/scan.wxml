@@ -1,0 +1,38 @@
+<t-navbar title="车间流程卡" />
+
+<view class="scan-page">
+  <view class="scan-hero">
+    <view class="scan-hero__icon">
+      <t-icon name="scan" size="80rpx" />
+    </view>
+    <view class="scan-hero__title">扫码上锁 · 填报</view>
+    <view class="scan-hero__desc">扫描流程卡二维码，自动锁定并进入工段填报</view>
+  </view>
+
+  <view class="scan-actions">
+    <t-button theme="primary" block size="large" bind:tap="handleScan" loading="{{loading}}">
+      扫码上锁
+    </t-button>
+    <t-button theme="default" block bind:tap="handleManualInput" disabled="{{loading}}">
+      手动输入卡号
+    </t-button>
+  </view>
+
+  <view class="scan-meta">
+    <t-cell-group theme="card">
+      <t-cell title="当前操作员" note="{{operatorName || '未设置'}}" arrow hover bind:click="handleSetOperator" />
+      <t-cell title="最近卡号" note="{{lastCardNo || '暂无'}}" />
+    </t-cell-group>
+  </view>
+
+  <view class="scan-tip" wx:if="{{!lastCardNo}}">
+    <t-icon name="info-circle" size="32rpx" />
+    <text>首次使用？点击底部按钮初始化测试数据</text>
+  </view>
+
+  <view class="scan-footer">
+    <t-button theme="default" size="small" variant="outline" bind:tap="handleSeedData">
+      初始化测试数据
+    </t-button>
+  </view>
+</view>
