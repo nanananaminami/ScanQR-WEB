@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "角色与权限",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "t-input": "tdesign-miniprogram/input/input",
+    "t-button": "tdesign-miniprogram/button/button",
+    "t-loading": "tdesign-miniprogram/loading/loading",
+    "t-navbar": "tdesign-miniprogram/navbar/navbar"
+  }
+}

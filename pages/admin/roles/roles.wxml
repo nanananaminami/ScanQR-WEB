@@ -1,0 +1,60 @@
+<t-navbar title="角色与权限" leftArrow />
+
+<view class="roles-page">
+  <view class="roles-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="roles-list-section">
+      <view class="section-title">角色列表</view>
+      <view class="roles-list">
+        <view class="role-chip {{currentRole && currentRole.role_id === item.role_id ? 'role-chip--active' : ''}}"
+              wx:for="{{roles}}" wx:key="role_id"
+              data-index="{{index}}" bindtap="selectRole">
+          {{item.role_name}}
+          <text class="role-chip__sys" wx:if="{{item.is_system}}">系统</text>
+        </view>
+      </view>
+      <t-button theme="primary" size="small" bind:tap="startCreate" style="margin-top: 16rpx;">
+        + 新建角色
+      </t-button>
+    </view>
+
+    <view class="role-editor" wx:if="{{editing}}">
+      <view class="section-title">{{currentRole ? '编辑角色' : '新建角色'}}{{isSystem ? '（系统内置）' : ''}}</view>
+
+      <view class="form-row">
+        <text class="form-label">角色标识</text>
+        <t-input value="{{editingId}}" placeholder="如 qc_leader" bind:change="onIdChange" disabled="{{isSystem}}" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">角色名称</text>
+        <t-input value="{{editingName}}" placeholder="如 质检组长" bind:change="onNameChange" disabled="{{isSystem}}" />
+      </view>
+
+      <view class="form-row">
+        <text class="form-label">权限分配</text>
+        <view class="perm-groups">
+          <view class="perm-group" wx:for="{{permissionGroups}}" wx:for-item="group" wx:key="module">
+            <view class="perm-group__title">{{group.module_name}}</view>
+            <view class="perm-group__items">
+              <view class="perm-item {{selectedPerms[item.id] ? 'perm-item--on' : ''}}"
+                    wx:for="{{group.perms}}" wx:for-item="item" wx:key="id"
+                    data-perm="{{item.id}}" bindtap="togglePerm">
+                <text class="perm-item__check">{{selectedPerms[item.id] ? '✓' : ''}}</text>
+                <text>{{item.name}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="editor-actions">
+        <t-button theme="default" variant="outline" bind:tap="cancelEdit">取消</t-button>
+        <t-button theme="primary" bind:tap="saveCurrent" loading="{{saving}}">保存</t-button>
+      </view>
+      <view class="editor-tip" wx:if="{{currentRole}}">修改后立即生效，所有绑定该角色的用户权限自动更新。</view>
+    </view>
+  </block>
+</view>

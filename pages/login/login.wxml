@@ -1,0 +1,31 @@
+<t-navbar title="登录" />
+
+<view class="login-page">
+  <view class="login-hero">
+    <view class="login-hero__icon">
+      <t-icon name="lock-on" size="80rpx" />
+    </view>
+    <view class="login-hero__title">车间流程卡报工系统</view>
+    <view class="login-hero__desc">请使用账号密码登录</view>
+  </view>
+
+  <view class="login-form">
+    <t-input value="{{username}}" placeholder="请输入账号" bind:change="onUsernameChange" clearable prefix-icon="user" />
+    <t-input value="{{password}}" placeholder="请输入密码" type="password" bind:change="onPasswordChange" clearable prefix-icon="lock-on" />
+
+    <t-button theme="primary" block size="large" bind:tap="doLogin" loading="{{loading}}" style="margin-top: 32rpx;">
+      登 录
+    </t-button>
+  </view>
+
+  <view class="login-seed" wx:if="{{showSeedHint}}">
+    <view class="login-seed__text">首次使用？点击下方按钮初始化系统（将创建默认管理员 admin / admin123）</view>
+    <t-button theme="default" size="small" variant="outline" bind:tap="handleSeedData">
+      初始化系统
+    </t-button>
+  </view>
+
+  <view class="login-footer">
+    <text>ScanQR-WEB v2.0 · 账号密码登录</text>
+  </view>
+</view>

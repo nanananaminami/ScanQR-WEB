@@ -1,15 +1,14 @@
 const ALL_TABS = [
-  { pagePath: '/pages/admin/dashboard/dashboard', text: '看板', icon: 'app' },
-  { pagePath: '/pages/admin/cards/cards', text: '在制', icon: 'view-list' },
-  { pagePath: '/pages/admin/logs/logs', text: '日志', icon: 'calendar' },
-  { pagePath: '/pages/scan/scan', text: '扫码', icon: 'scan' },
-  { pagePath: '/pages/admin/profile/profile', text: '我的', icon: 'user' }
+  { pagePath: '/pages/admin/dashboard/dashboard', text: '看板', icon: 'app', perm: 'dashboard_view' },
+  { pagePath: '/pages/admin/cards/cards', text: '在制', icon: 'view-list', perm: 'card_list' },
+  { pagePath: '/pages/admin/logs/logs', text: '日志', icon: 'calendar', perm: 'log_view' },
+  { pagePath: '/pages/scan/scan', text: '扫码', icon: 'scan', perm: 'card_submit' },
+  { pagePath: '/pages/admin/profile/profile', text: '我的', icon: 'user', perm: null }
 ];
 
 Component({
   data: {
     selected: 0,
-    role: '',
     list: []
   },
 
@@ -32,11 +31,9 @@ Component({
   methods: {
     refresh() {
       const app = getApp();
-      const role = app.globalData.role || '';
-      const list = role === 'admin'
-        ? ALL_TABS
-        : ALL_TABS.filter(t => t.text === '扫码' || t.text === '我的');
-      this.setData({ role, list });
+      const perms = (app && app.globalData.permissions) || [];
+      const list = ALL_TABS.filter(t => !t.perm || perms.indexOf(t.perm) !== -1);
+      this.setData({ list });
       this.syncSelected();
     },
 

@@ -1,0 +1,9 @@
+{
+  "name": "adminResetPassword",
+  "version": "1.0.0",
+  "description": "管理员重置用户密码",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

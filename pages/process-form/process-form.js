@@ -1,4 +1,4 @@
-const app = getApp();
+const auth = require('../utils/auth');
 
 Page({
   data: {
@@ -15,7 +15,7 @@ Page({
 
   onLoad(options) {
     const cardNo = options.card_no ? decodeURIComponent(options.card_no) : '';
-    const locked = app.globalData.lockedCard;
+    const locked = getApp().globalData.lockedCard;
 
     if (locked && locked.cardData) {
       this.initForm(locked);
@@ -44,7 +44,7 @@ Page({
       fields,
       formData,
       stepName: (templateData && templateData.step_name) || cardData.current_step || '',
-      operatorName: operator || '测试员工'
+      operatorName: operator || '操作员'
     });
   },
 
@@ -90,23 +90,20 @@ Page({
     this.setData({ submitting: true });
     wx.showLoading({ title: '提交中...' });
 
-    wx.cloud.callFunction({
-      name: 'submitAndUnlockCard',
-      data: {
-        card_no: cardData.card_no,
-        card_id: cardData._id,
-        form_data: formData,
-        step_name: this.data.stepName,
-        user_name: operatorName,
-        cancelled: false
-      }
+    auth.callWithAuth('submitAndUnlockCard', {
+      card_no: cardData.card_no,
+      card_id: cardData._id,
+      form_data: formData,
+      step_name: this.data.stepName,
+      user_name: operatorName,
+      cancelled: false
     }).then((res) => {
       wx.hideLoading();
       this.setData({ submitting: false });
       const result = res.result || {};
       if (result.success) {
         this.setData({ submitted: true });
-        app.globalData.lockedCard = null;
+        getApp().globalData.lockedCard = null;
         wx.showToast({ title: '提交成功', icon: 'success' });
         setTimeout(() => wx.navigateBack(), 1500);
       } else {
@@ -115,7 +112,7 @@ Page({
     }).catch(() => {
       wx.hideLoading();
       this.setData({ submitting: false });
-      wx.showModal({ title: '提交失败', content: '云函数调用异常，请检查部署', showCancel: false });
+      wx.showModal({ title: '提交失败', content: '云函数调用异常', showCancel: false });
     });
   },
 
@@ -130,20 +127,17 @@ Page({
         if (!res.confirm) return;
         this.setData({ submitting: true });
         wx.showLoading({ title: '解锁中...' });
-        wx.cloud.callFunction({
-          name: 'submitAndUnlockCard',
-          data: {
-            card_no: cardData.card_no,
-            card_id: cardData._id,
-            form_data: {},
-            step_name: this.data.stepName,
-            user_name: operatorName,
-            cancelled: true
-          }
-        }).then((res) => {
+        auth.callWithAuth('submitAndUnlockCard', {
+          card_no: cardData.card_no,
+          card_id: cardData._id,
+          form_data: {},
+          step_name: this.data.stepName,
+          user_name: operatorName,
+          cancelled: true
+        }).then(() => {
           wx.hideLoading();
           this.setData({ submitting: false, submitted: true });
-          app.globalData.lockedCard = null;
+          getApp().globalData.lockedCard = null;
           wx.showToast({ title: '已解锁', icon: 'success' });
           setTimeout(() => wx.navigateBack(), 1000);
         }).catch(() => {
@@ -158,16 +152,14 @@ Page({
   onUnload() {
     if (this.data.submitted || !this.data.cardData) return;
     const { cardData, operatorName } = this.data;
-    wx.cloud.callFunction({
-      name: 'submitAndUnlockCard',
-      data: {
-        card_no: cardData.card_no,
-        card_id: cardData._id,
-        form_data: {},
-        user_name: operatorName,
-        cancelled: true
-      }
-    });
+    // 异步释放锁，不等待返回
+    auth.callWithAuth('submitAndUnlockCard', {
+      card_no: cardData.card_no,
+      card_id: cardData._id,
+      form_data: {},
+      user_name: operatorName,
+      cancelled: true
+    }).catch(() => {});
   },
 
   goScan() {

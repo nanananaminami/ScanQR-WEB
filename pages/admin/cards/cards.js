@@ -1,4 +1,4 @@
-const app = getApp();
+const auth = require('../../../utils/auth');
 const db = wx.cloud.database();
 
 Page({
@@ -10,28 +10,21 @@ Page({
   },
 
   onLoad() {
-    this.waitRoleAndLoad();
+    if (!auth.requireLogin()) return;
+    this.checkAndLoad();
   },
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().refresh();
     }
-    if (app.globalData.roleReady && app.globalData.role === 'admin') {
+    if (auth.hasPerm('card_list')) {
       this.loadCards();
     }
   },
 
-  waitRoleAndLoad() {
-    if (app.globalData.roleReady) {
-      this.checkRoleAndLoad();
-    } else {
-      app.globalData.roleCallbacks.push(() => this.checkRoleAndLoad());
-    }
-  },
-
-  checkRoleAndLoad() {
-    if (app.globalData.role !== 'admin') {
+  checkAndLoad() {
+    if (!auth.hasPerm('card_list')) {
       wx.switchTab({ url: '/pages/scan/scan' });
       return;
     }
@@ -75,6 +68,10 @@ Page({
   },
 
   confirmUnlock(e) {
+    if (!auth.hasPerm('card_unlock')) {
+      wx.showModal({ title: '无权限', content: '缺少 card_unlock 权限', showCancel: false });
+      return;
+    }
     const index = e.currentTarget.dataset.index;
     const card = this.data.filteredCards[index];
     if (!card) return;
@@ -91,13 +88,12 @@ Page({
   },
 
   doForceUnlock(card) {
+    const session = auth.getSession() || {};
+    const userName = (session.user && (session.user.real_name || session.user.username)) || '管理员';
     wx.showLoading({ title: '解锁中...' });
-    wx.cloud.callFunction({
-      name: 'adminForceUnlock',
-      data: {
-        card_id: card._id,
-        user_name: (app.globalData.user && app.globalData.user.name) || '管理员'
-      }
+    auth.callWithAuth('adminForceUnlock', {
+      card_id: card._id,
+      user_name: userName
     }).then((res) => {
       wx.hideLoading();
       const result = res.result || {};
@@ -109,7 +105,7 @@ Page({
       }
     }).catch(() => {
       wx.hideLoading();
-      wx.showModal({ title: '解锁失败', content: '请检查 adminForceUnlock 云函数是否已部署', showCancel: false });
+      wx.showModal({ title: '解锁失败', content: '云函数调用异常', showCancel: false });
     });
   },
 

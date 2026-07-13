@@ -1,18 +1,25 @@
-const app = getApp();
+const auth = require('../../utils/auth');
 
 Page({
   data: {
     loading: false,
     lastCardNo: '',
-    operatorName: '测试员工'
+    operatorName: ''
   },
 
   onLoad() {
-    const name = wx.getStorageSync('operator_name');
-    if (name) this.setData({ operatorName: name });
+    if (!auth.requireLogin()) return;
+    if (!auth.hasPerm('card_submit')) {
+      wx.showModal({ title: '无权限', content: '缺少 card_submit 权限，无法扫码报工', showCancel: false });
+      return;
+    }
+    // 默认使用当前登录用户的姓名作为操作员
+    const session = auth.getSession() || {};
+    const defaultName = (session.user && (session.user.real_name || session.user.username)) || '操作员';
+    const name = wx.getStorageSync('operator_name') || defaultName;
+    this.setData({ operatorName: name });
     const last = wx.getStorageSync('last_card_no');
     if (last) this.setData({ lastCardNo: last });
-    this.checkRoleRedirect();
   },
 
   onShow() {
@@ -21,22 +28,12 @@ Page({
     }
   },
 
-  checkRoleRedirect() {
-    if (app.globalData.roleReady) {
-      if (app.globalData.role === 'admin') {
-        wx.switchTab({ url: '/pages/admin/dashboard/dashboard' });
-      }
-    } else {
-      app.globalData.roleCallbacks.push((role) => {
-        if (role === 'admin') {
-          wx.switchTab({ url: '/pages/admin/dashboard/dashboard' });
-        }
-      });
-    }
-  },
-
   handleScan() {
     if (this.data.loading) return;
+    if (!auth.hasPerm('card_submit')) {
+      wx.showModal({ title: '无权限', content: '缺少 card_submit 权限', showCancel: false });
+      return;
+    }
     wx.scanCode({
       onlyFromCamera: false,
       success: (res) => {
@@ -67,11 +64,12 @@ Page({
 
   lockCard(cardNo) {
     this.setData({ loading: true });
-    const operatorName = this.data.operatorName || '测试员工';
+    const operatorName = this.data.operatorName || '操作员';
+    const app = getApp();
 
-    wx.cloud.callFunction({
-      name: 'getAndLockCard',
-      data: { card_no: cardNo, user_name: operatorName }
+    auth.callWithAuth('getAndLockCard', {
+      card_no: cardNo,
+      user_name: operatorName
     }).then((res) => {
       this.setData({ loading: false });
       const result = res.result || {};
@@ -97,7 +95,7 @@ Page({
       this.setData({ loading: false });
       wx.showModal({
         title: '调用失败',
-        content: '请检查云函数 getAndLockCard 是否已部署',
+        content: '云函数调用异常，请重试',
         showCancel: false
       });
     });
@@ -123,13 +121,17 @@ Page({
   },
 
   handleSeedData() {
+    if (!auth.hasPerm('seed_init')) {
+      wx.showModal({ title: '无权限', content: '缺少 seed_init 权限', showCancel: false });
+      return;
+    }
     wx.showModal({
       title: '初始化测试数据',
-      content: '将在云数据库创建质检模板与样例流程卡，用于首次联调。是否继续？',
+      content: '将创建质检模板与样例流程卡（若已初始化则跳过）。是否继续？',
       success: (res) => {
         if (!res.confirm) return;
         wx.showLoading({ title: '初始化中...' });
-        wx.cloud.callFunction({ name: 'initSeedData' })
+        auth.callWithAuth('initSeedData')
           .then((r) => {
             wx.hideLoading();
             const result = r.result || {};
@@ -143,7 +145,7 @@ Page({
             wx.hideLoading();
             wx.showModal({
               title: '初始化失败',
-              content: '请先部署 initSeedData 云函数',
+              content: '云函数调用异常',
               showCancel: false
             });
           });

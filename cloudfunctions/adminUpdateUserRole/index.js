@@ -1,45 +1,76 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
+const _ = db.command;
 
-const VALID_ROLES = ['admin', 'operator', 'disabled'];
+async function authenticate(event) {
+  const token = event.session_token;
+  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
+  const sessionRes = await db.collection('sys_sessions').where({
+    session_token: token,
+    expires_at: _.gt(new Date())
+  }).get();
+  if (sessionRes.data.length === 0) {
+    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
+  }
+  const session = sessionRes.data[0];
+  let user = null;
+  try {
+    const userRes = await db.collection('sys_users').doc(session.user_id).get();
+    user = userRes.data;
+  } catch (e) {
+    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
+  }
+  if (!user || user.status === 'disabled') {
+    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
+  }
+  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
+  const role = roleRes.data[0] || null;
+  const permissions = (role && role.permissions) || [];
+  db.collection('sys_sessions').doc(session._id).update({
+    data: { last_active: db.serverDate() }
+  }).catch(() => {});
+  return { ok: true, user, role, role_id: user.role_id, permissions, session };
+}
 
 exports.main = async (event, context) => {
-  const { target_openid, new_role } = event;
-  const wxContext = cloud.getWXContext();
-
-  if (!target_openid || !VALID_ROLES.includes(new_role)) {
-    return { success: false, code: 'INVALID_PARAMS', msg: '参数无效' };
-  }
-
+  const { target_user_id, new_role_id } = event;
   try {
-    // 权限校验：仅管理员
-    const callerRes = await db.collection('sys_users').where({ openid: wxContext.OPENID }).get();
-    if (callerRes.data.length === 0 || callerRes.data[0].role !== 'admin') {
-      return { success: false, code: 'FORBIDDEN', msg: '无权限：仅管理员可修改角色' };
+    const auth = await authenticate(event);
+    if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
+    if (auth.permissions.indexOf('user_manage') === -1) {
+      return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 user_manage 权限' };
     }
 
-    // 禁止降级自己（避免锁死）
-    if (target_openid === wxContext.OPENID && new_role !== 'admin') {
-      return { success: false, code: 'SELF_DEMOTE', msg: '不能降级自己的管理员权限' };
+    if (!target_user_id || !new_role_id) {
+      return { success: false, code: 'INVALID_PARAMS', msg: '参数无效' };
     }
 
-    // 降级管理员时，确保至少保留一名管理员
-    if (new_role !== 'admin') {
-      const targetRes = await db.collection('sys_users').where({ openid: target_openid }).get();
-      if (targetRes.data.length > 0 && targetRes.data[0].role === 'admin') {
-        const adminCountRes = await db.collection('sys_users').where({ role: 'admin' }).count();
-        if (adminCountRes.total <= 1) {
-          return { success: false, code: 'LAST_ADMIN', msg: '系统至少需要保留一名管理员' };
-        }
+    const roleRes = await db.collection('sys_roles').where({ role_id: new_role_id }).get();
+    if (roleRes.data.length === 0) {
+      return { success: false, code: 'INVALID_ROLE', msg: '角色不存在' };
+    }
+
+    const targetRes = await db.collection('sys_users').doc(target_user_id).get();
+    const target = targetRes.data;
+    if (!target) return { success: false, code: 'NOT_FOUND', msg: '用户不存在' };
+
+    // 最后一名管理员保护
+    if (target.role_id === 'admin' && new_role_id !== 'admin') {
+      const adminCountRes = await db.collection('sys_users').where({ role_id: 'admin', status: 'active' }).count();
+      if (adminCountRes.total <= 1) {
+        return { success: false, code: 'LAST_ADMIN', msg: '系统至少需要保留一名在职管理员' };
       }
     }
 
-    await db.collection('sys_users').where({ openid: target_openid }).update({
-      data: { role: new_role, updated_at: db.serverDate() }
+    await db.collection('sys_users').doc(target_user_id).update({
+      data: { role_id: new_role_id, updated_at: db.serverDate() }
     });
 
-    return { success: true, msg: '角色已更新为：' + ({ admin: '管理员', operator: '操作员', disabled: '已禁用' }[new_role]) };
+    // 角色变更后使该用户所有会话失效（强制重新登录以刷新权限）
+    await db.collection('sys_sessions').where({ user_id: target_user_id }).remove();
+
+    return { success: true, msg: '角色已更新为：' + roleRes.data[0].role_name };
   } catch (err) {
     return { success: false, msg: '更新失败', error: err };
   }

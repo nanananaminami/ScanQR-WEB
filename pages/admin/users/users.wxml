@@ -1,11 +1,17 @@
 <t-navbar title="人员管理" leftArrow />
 
 <view class="users-page">
-  <view class="filter-chips">
-    <view class="filter-chip {{roleFilter === 'all' ? 'filter-chip--active' : ''}}" data-role="all" bindtap="onRoleFilterChange">全部</view>
-    <view class="filter-chip {{roleFilter === 'admin' ? 'filter-chip--active' : ''}}" data-role="admin" bindtap="onRoleFilterChange">管理员</view>
-    <view class="filter-chip {{roleFilter === 'operator' ? 'filter-chip--active' : ''}}" data-role="operator" bindtap="onRoleFilterChange">操作员</view>
-    <view class="filter-chip {{roleFilter === 'disabled' ? 'filter-chip--active' : ''}}" data-role="disabled" bindtap="onRoleFilterChange">已禁用</view>
+  <view class="users-toolbar">
+    <scroll-view scroll-x class="filter-scroll">
+      <view class="filter-chips">
+        <view class="filter-chip {{roleFilter === 'all' ? 'filter-chip--active' : ''}}" data-role="all" bindtap="onFilterChange">全部</view>
+        <view class="filter-chip {{roleFilter === item.role_id ? 'filter-chip--active' : ''}}"
+              wx:for="{{roles}}" wx:key="role_id" data-role="{{item.role_id}}" bindtap="onFilterChange">
+          {{item.role_name}}
+        </view>
+      </view>
+    </scroll-view>
+    <t-button theme="primary" size="small" bind:tap="openCreate">+ 新建用户</t-button>
   </view>
 
   <view class="users-loading" wx:if="{{loading}}">
@@ -13,23 +19,59 @@
   </view>
 
   <block wx:if="{{!loading}}">
-    <view class="user-list" wx:if="{{filteredUsers.length > 0}}">
-      <view class="user-item" wx:for="{{filteredUsers}}" wx:key="_id">
+    <view class="user-list">
+      <view class="user-item" wx:for="{{users}}" wx:key="_id"
+            wx:if="{{roleFilter === 'all' || item.role_id === roleFilter}}"
+            data-index="{{index}}" bindtap="tapUser">
         <view class="user-item__header">
-          <view class="user-item__name">{{item.name}}</view>
-          <t-tag theme="{{item.roleTagTheme}}" variant="light" size="small">{{item.roleText}}</t-tag>
+          <view class="user-item__name">{{item.real_name || item.username}}</view>
+          <view class="user-item__tags">
+            <t-tag theme="primary" variant="light" size="small">{{item.role_name}}</t-tag>
+            <t-tag theme="{{item.statusTheme}}" variant="light" size="small">{{item.statusText}}</t-tag>
+          </view>
         </view>
-        <view class="user-item__openid">{{item.openidShort}}</view>
-        <view class="user-item__meta">注册时间：{{item.createdText}}</view>
-        <view class="user-item__action" data-index="{{index}}" bindtap="changeRole">
-          <text>角色管理</text>
-          <t-icon name="chevron-right" size="32rpx" />
-        </view>
+        <view class="user-item__meta">账号：{{item.username}} · 部门：{{item.department || '-'}}</view>
+        <view class="user-item__meta">注册：{{item.createdText}} · 最近登录：{{item.lastLoginText}}</view>
       </view>
     </view>
 
-    <view class="users-empty" wx:else>
-      <t-empty description="暂无用户" />
+    <view class="users-empty" wx:if="{{users.length === 0}}">
+      <t-empty description="暂无用户，点击右上角创建" />
     </view>
   </block>
+</view>
+
+<!-- 创建用户浮层 -->
+<view class="create-mask" wx:if="{{showCreate}}" bindtap="closeCreate"></view>
+<view class="create-panel" wx:if="{{showCreate}}">
+  <view class="create-panel__title">新建用户</view>
+  <view class="create-panel__form">
+    <view class="form-row">
+      <text class="form-label">登录账号 *</text>
+      <t-input value="{{form.username}}" placeholder="如 zhangsan" data-field="username" bind:change="onFormChange" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">初始密码 *</text>
+      <t-input value="{{form.password}}" type="password" placeholder="至少 6 位" data-field="password" bind:change="onFormChange" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">姓名</text>
+      <t-input value="{{form.real_name}}" placeholder="如 张三" data-field="real_name" bind:change="onFormChange" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">部门</text>
+      <t-input value="{{form.department}}" placeholder="如 质检车间" data-field="department" bind:change="onFormChange" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">绑定角色 *</text>
+      <view class="role-picker" bindtap="pickRole">
+        <text class="role-picker__text">{{form.role_id || '请选择'}}</text>
+        <t-icon name="chevron-right" size="32rpx" />
+      </view>
+    </view>
+  </view>
+  <view class="create-panel__actions">
+    <t-button theme="default" variant="outline" bind:tap="closeCreate">取消</t-button>
+    <t-button theme="primary" bind:tap="submitCreate" loading="{{creating}}">创建</t-button>
+  </view>
 </view>

@@ -4,11 +4,22 @@
   box-sizing: border-box;
 }
 
-.filter-chips {
+.users-toolbar {
   display: flex;
+  align-items: center;
   gap: 16rpx;
   margin-bottom: 24rpx;
-  flex-wrap: wrap;
+}
+
+.filter-scroll {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.filter-chips {
+  display: inline-flex;
+  gap: 16rpx;
+  flex-wrap: nowrap;
 }
 
 .filter-chip {
@@ -17,6 +28,7 @@
   font-size: 24rpx;
   background: var(--td-bg-color-component, #f0f0f0);
   color: var(--td-text-color-secondary, #909399);
+  white-space: nowrap;
 }
 
 .filter-chip--active {
@@ -56,29 +68,92 @@
   color: var(--td-text-color-primary, #303133);
 }
 
-.user-item__openid {
-  font-size: 24rpx;
-  color: var(--td-text-color-secondary, #909399);
-  margin-bottom: 8rpx;
-  font-family: monospace;
+.user-item__tags {
+  display: flex;
+  gap: 8rpx;
 }
 
 .user-item__meta {
   font-size: 24rpx;
   color: var(--td-text-color-secondary, #909399);
-}
-
-.user-item__action {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 20rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid var(--td-component-border, #f0f0f0);
-  font-size: 28rpx;
-  color: #0052D9;
+  margin-bottom: 6rpx;
 }
 
 .users-empty {
   padding-top: 160rpx;
+}
+
+/* 创建用户浮层 */
+.create-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.create-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  z-index: 101;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.create-panel__title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--td-text-color-primary, #303133);
+  margin-bottom: 28rpx;
+  text-align: center;
+}
+
+.create-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.form-label {
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #909399);
+}
+
+.role-picker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background: var(--td-bg-color-component, #f0f0f0);
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: var(--td-text-color-primary, #303133);
+}
+
+.role-picker__text {
+  flex: 1;
+}
+
+.create-panel__actions {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 32rpx;
+}
+
+.create-panel__actions > view,
+.create-panel__actions > t-button {
+  flex: 1;
 }

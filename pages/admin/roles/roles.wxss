@@ -1,0 +1,136 @@
+.roles-page {
+  padding: 24rpx 32rpx 80rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.roles-loading {
+  display: flex;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--td-text-color-secondary, #909399);
+  margin-bottom: 20rpx;
+}
+
+.roles-list-section {
+  margin-bottom: 40rpx;
+}
+
+.roles-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.role-chip {
+  padding: 14rpx 28rpx;
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  background: var(--td-bg-color-component, #f0f0f0);
+  color: var(--td-text-color-primary, #303133);
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.role-chip--active {
+  background: #0052D9;
+  color: #ffffff;
+}
+
+.role-chip__sys {
+  font-size: 20rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.role-chip:not(.role-chip--active) .role-chip__sys {
+  background: rgba(0, 82, 217, 0.1);
+  color: #0052D9;
+}
+
+.role-editor {
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: 16rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.form-row {
+  margin-bottom: 28rpx;
+}
+
+.form-label {
+  display: block;
+  font-size: 26rpx;
+  color: var(--td-text-color-secondary, #909399);
+  margin-bottom: 12rpx;
+}
+
+.perm-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.perm-group__title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--td-text-color-primary, #303133);
+  margin-bottom: 12rpx;
+}
+
+.perm-group__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.perm-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 14rpx 24rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  background: var(--td-bg-color-component, #f0f0f0);
+  color: var(--td-text-color-primary, #303133);
+  border: 2rpx solid transparent;
+}
+
+.perm-item--on {
+  background: rgba(0, 82, 217, 0.08);
+  color: #0052D9;
+  border-color: #0052D9;
+}
+
+.perm-item__check {
+  font-size: 28rpx;
+  font-weight: 700;
+  width: 32rpx;
+  color: #0052D9;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 36rpx;
+}
+
+.editor-actions > view,
+.editor-actions > t-button {
+  flex: 1;
+}
+
+.editor-tip {
+  margin-top: 20rpx;
+  font-size: 22rpx;
+  color: var(--td-text-color-placeholder, #c0c4cc);
+  line-height: 1.6;
+}

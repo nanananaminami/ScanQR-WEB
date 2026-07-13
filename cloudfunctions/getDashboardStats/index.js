@@ -3,30 +3,52 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext();
-
+async function authenticate(event) {
+  const token = event.session_token;
+  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
+  const sessionRes = await db.collection('sys_sessions').where({
+    session_token: token,
+    expires_at: _.gt(new Date())
+  }).get();
+  if (sessionRes.data.length === 0) {
+    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
+  }
+  const session = sessionRes.data[0];
+  let user = null;
   try {
-    // 权限校验：仅管理员可查看
-    const userRes = await db.collection('sys_users').where({ openid: wxContext.OPENID }).get();
-    if (userRes.data.length === 0 || userRes.data[0].role !== 'admin') {
-      return { success: false, code: 'FORBIDDEN', msg: '无权限：仅管理员可查看看板' };
+    const userRes = await db.collection('sys_users').doc(session.user_id).get();
+    user = userRes.data;
+  } catch (e) {
+    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
+  }
+  if (!user || user.status === 'disabled') {
+    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
+  }
+  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
+  const role = roleRes.data[0] || null;
+  const permissions = (role && role.permissions) || [];
+  db.collection('sys_sessions').doc(session._id).update({
+    data: { last_active: db.serverDate() }
+  }).catch(() => {});
+  return { ok: true, user, role, role_id: user.role_id, permissions, session };
+}
+
+exports.main = async (event, context) => {
+  try {
+    const auth = await authenticate(event);
+    if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
+    if (auth.permissions.indexOf('dashboard_view') === -1) {
+      return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 dashboard_view 权限' };
     }
 
-    // 今日零点
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
     const [todayLogs, activeCards, lockedCards, todayExceptions, totalLogs] = await Promise.all([
-      // 今日扫码量（今日提交的报工日志数）
       db.collection('process_logs').where({ submit_time: _.gte(todayStart) }).count(),
-      // 在制卡片数
       db.collection('process_cards').where({ status: '加工中' }).count(),
-      // 锁定中卡片数
       db.collection('process_cards').where({ is_locked: true }).count(),
-      // 今日异常提报数（今日放弃的日志数）
       db.collection('process_logs').where({ submit_time: _.gte(todayStart), cancelled: true }).count(),
-      // 总报工数
       db.collection('process_logs').count()
     ]);
 

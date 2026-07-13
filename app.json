@@ -1,6 +1,7 @@
 {
   "darkmode": true,
   "pages": [
+    "pages/login/login",
     "pages/scan/scan",
     "pages/process-form/process-form",
     "pages/qr-gen/qr-gen",
@@ -10,6 +11,7 @@
     "pages/admin/logs/logs",
     "pages/admin/trace/trace",
     "pages/admin/users/users",
+    "pages/admin/roles/roles",
     "pages/home/home",
     "pages/button/button",
     "pages/button/skyline/button",

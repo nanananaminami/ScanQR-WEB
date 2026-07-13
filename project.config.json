@@ -422,5 +422,6 @@
     "tabIndent": "auto",
     "tabSize": 2
   },
-  "projectArchitecture": "multiPlatform"
+  "projectArchitecture": "multiPlatform",
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

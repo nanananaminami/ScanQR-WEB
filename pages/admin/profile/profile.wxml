@@ -2,33 +2,35 @@
 
 <view class="profile-page">
   <view class="profile-header">
-    <view class="profile-avatar">{{user.name ? user.name[0] : '?'}}</view>
+    <view class="profile-avatar">{{user.real_name ? user.real_name[0] : (user.username ? user.username[0] : '?')}}</view>
     <view class="profile-info">
-      <view class="profile-name">{{user.name || '未登录'}}</view>
-      <t-tag theme="{{role === 'admin' ? 'primary' : 'default'}}" variant="light" size="small">
-        {{role === 'admin' ? '管理员' : '操作员'}}
-      </t-tag>
+      <view class="profile-name">{{user.real_name || user.username || '未登录'}}</view>
+      <t-tag theme="primary" variant="light" size="small">{{roleName || '未登录'}}</t-tag>
     </view>
   </view>
 
   <view class="profile-section">
     <t-cell-group theme="card">
-      <t-cell title="身份角色" note="{{role === 'admin' ? '管理员' : '操作员'}}" />
-      <t-cell title="OpenID" note="{{openidShort}}" />
+      <t-cell title="登录账号" note="{{user.username || '-'}}" />
+      <t-cell title="所属角色" note="{{roleName || '-'}}" />
+      <t-cell title="所属部门" note="{{user.department || '-'}}" />
       <t-cell title="注册时间" note="{{createdText}}" />
+      <t-cell title="最近登录" note="{{lastLoginText}}" />
     </t-cell-group>
   </view>
 
   <view class="profile-section">
     <t-cell-group theme="card">
       <t-cell title="扫码报工" arrow hover bind:click="goScan" />
-      <t-cell wx:if="{{role === 'admin'}}" title="在制卡片管理" arrow hover bind:click="goCards" />
-      <t-cell wx:if="{{role === 'admin'}}" title="人员管理" arrow hover bind:click="goUsers" />
+      <t-cell wx:if="{{permissions.indexOf('card_list') !== -1}}" title="在制卡片管理" arrow hover bind:click="goCards" />
+      <t-cell wx:if="{{permissions.indexOf('user_manage') !== -1}}" title="人员管理" arrow hover bind:click="goUsers" />
+      <t-cell wx:if="{{permissions.indexOf('role_manage') !== -1}}" title="角色与权限管理" arrow hover bind:click="goRoles" />
+      <t-cell title="退出登录" arrow hover bind:click="handleLogout" />
       <t-cell title="清除本地缓存" arrow hover bind:click="clearCache" />
     </t-cell-group>
   </view>
 
   <view class="profile-footer">
-    <text>车间流程卡报工系统 v1.0</text>
+    <text>车间流程卡报工系统 v2.0</text>
   </view>
 </view>

@@ -1,7 +1,12 @@
 const cloud = require('wx-server-sdk');
+const crypto = require('crypto');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
+
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
 
 async function authenticate(event) {
   const token = event.session_token;
@@ -34,6 +39,7 @@ async function authenticate(event) {
 }
 
 exports.main = async (event, context) => {
+  const { username, password, real_name, department, role_id, phone } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -41,28 +47,44 @@ exports.main = async (event, context) => {
       return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 user_manage 权限' };
     }
 
-    const [usersRes, rolesRes] = await Promise.all([
-      db.collection('sys_users').orderBy('created_at', 'desc').limit(100).get(),
-      db.collection('sys_roles').get()
-    ]);
-    const roleMap = {};
-    rolesRes.data.forEach(r => { roleMap[r.role_id] = r; });
+    if (!username || !password || !role_id) {
+      return { success: false, code: 'INVALID_PARAMS', msg: '账号、密码、角色为必填项' };
+    }
+    if (password.length < 6) {
+      return { success: false, code: 'INVALID_PARAMS', msg: '密码长度至少 6 位' };
+    }
 
-    const users = usersRes.data.map(u => ({
-      _id: u._id,
-      username: u.username,
-      real_name: u.real_name || '',
-      department: u.department || '',
-      phone: u.phone || '',
-      role_id: u.role_id,
-      role_name: (roleMap[u.role_id] && roleMap[u.role_id].role_name) || u.role_id,
-      status: u.status,
-      created_at: u.created_at,
-      last_login: u.last_login
-    }));
+    // 账号唯一性校验
+    const exist = await db.collection('sys_users').where({ username }).get();
+    if (exist.data.length > 0) {
+      return { success: false, code: 'DUP_USERNAME', msg: '账号已存在' };
+    }
 
-    return { success: true, users: users };
+    // 角色合法性
+    const roleRes = await db.collection('sys_roles').where({ role_id }).get();
+    if (roleRes.data.length === 0) {
+      return { success: false, code: 'INVALID_ROLE', msg: '角色不存在' };
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = hashPassword(password, salt);
+
+    const newUser = {
+      username,
+      password_salt: salt,
+      password_hash: hash,
+      role_id,
+      real_name: real_name || '',
+      department: department || '',
+      phone: phone || '',
+      status: 'active',
+      created_at: db.serverDate(),
+      last_login: null
+    };
+
+    const addRes = await db.collection('sys_users').add({ data: newUser });
+    return { success: true, msg: '用户创建成功', user_id: addRes._id };
   } catch (err) {
-    return { success: false, msg: '查询失败', error: err };
+    return { success: false, msg: '创建失败', error: err };
   }
 };

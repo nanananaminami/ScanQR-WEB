@@ -1,4 +1,4 @@
-const app = getApp();
+const auth = require('../../../utils/auth');
 
 Page({
   data: {
@@ -14,7 +14,8 @@ Page({
   },
 
   onLoad() {
-    this.waitRoleAndLoad();
+    if (!auth.requireLogin()) return;
+    this.checkAndLoad();
   },
 
   onShow() {
@@ -23,40 +24,31 @@ Page({
     }
   },
 
-  waitRoleAndLoad() {
-    if (app.globalData.roleReady) {
-      this.checkRoleAndLoad();
-    } else {
-      app.globalData.roleCallbacks.push(() => this.checkRoleAndLoad());
-    }
-  },
-
-  checkRoleAndLoad() {
-    const role = app.globalData.role;
-    if (role !== 'admin') {
+  checkAndLoad() {
+    if (!auth.hasPerm('dashboard_view')) {
       wx.switchTab({ url: '/pages/scan/scan' });
       return;
     }
-    this.setData({ userName: (app.globalData.user && app.globalData.user.name) || '管理员' });
+    const session = auth.getSession() || {};
+    this.setData({
+      userName: (session.user && (session.user.real_name || session.user.username)) || '用户'
+    });
     this.loadStats();
   },
 
   loadStats() {
     this.setData({ loading: true });
-    wx.cloud.callFunction({ name: 'getDashboardStats' })
-      .then((res) => {
-        const result = res.result || {};
-        if (result.success) {
-          this.setData({ stats: result.stats, loading: false });
-        } else {
-          this.setData({ loading: false });
-          wx.showToast({ title: result.msg || '加载失败', icon: 'none' });
-        }
-      })
-      .catch(() => {
+    auth.callWithAuth('getDashboardStats').then((res) => {
+      const result = res.result || {};
+      if (result.success) {
+        this.setData({ stats: result.stats, loading: false });
+      } else {
         this.setData({ loading: false });
-        wx.showToast({ title: '请部署 getDashboardStats 云函数', icon: 'none' });
-      });
+        wx.showToast({ title: result.msg || '加载失败', icon: 'none' });
+      }
+    }).catch(() => {
+      this.setData({ loading: false });
+    });
   },
 
   goScan() {

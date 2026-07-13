@@ -1,4 +1,4 @@
-const app = getApp();
+const auth = require('../../../utils/auth');
 
 Page({
   data: {
@@ -12,7 +12,8 @@ Page({
   },
 
   onLoad() {
-    this.waitRoleAndLoad();
+    if (!auth.requireLogin()) return;
+    this.checkAndLoad();
   },
 
   onShow() {
@@ -21,16 +22,8 @@ Page({
     }
   },
 
-  waitRoleAndLoad() {
-    if (app.globalData.roleReady) {
-      this.checkRoleAndLoad();
-    } else {
-      app.globalData.roleCallbacks.push(() => this.checkRoleAndLoad());
-    }
-  },
-
-  checkRoleAndLoad() {
-    if (app.globalData.role !== 'admin') {
+  checkAndLoad() {
+    if (!auth.hasPerm('log_view')) {
       wx.switchTab({ url: '/pages/scan/scan' });
       return;
     }
@@ -45,14 +38,11 @@ Page({
       this.setData({ loadingMore: true });
     }
 
-    wx.cloud.callFunction({
-      name: 'getLogList',
-      data: {
-        keyword: this.data.keyword,
-        status: this.data.statusFilter,
-        page: page,
-        pageSize: 20
-      }
+    auth.callWithAuth('getLogList', {
+      keyword: this.data.keyword,
+      status: this.data.statusFilter,
+      page: page,
+      pageSize: 20
     }).then((res) => {
       const result = res.result || {};
       if (result.success) {
@@ -71,7 +61,6 @@ Page({
       }
     }).catch(() => {
       this.setData({ loading: false, loadingMore: false });
-      wx.showToast({ title: '请部署 getLogList 云函数', icon: 'none' });
     });
   },
 

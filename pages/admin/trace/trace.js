@@ -1,4 +1,4 @@
-const app = getApp();
+const auth = require('../../../utils/auth');
 
 Page({
   data: {
@@ -11,20 +11,14 @@ Page({
   onLoad(options) {
     const cardNo = options.card_no ? decodeURIComponent(options.card_no) : '';
     this.setData({ cardNo });
-    this.waitRoleAndLoad();
+    if (!auth.requireLogin()) return;
+    this.checkAndLoad();
   },
 
-  waitRoleAndLoad() {
-    if (app.globalData.roleReady) {
-      this.checkRoleAndLoad();
-    } else {
-      app.globalData.roleCallbacks.push(() => this.checkRoleAndLoad());
-    }
-  },
-
-  checkRoleAndLoad() {
-    if (app.globalData.role !== 'admin') {
-      wx.switchTab({ url: '/pages/scan/scan' });
+  checkAndLoad() {
+    if (!auth.hasPerm('card_trace')) {
+      wx.showToast({ title: '缺少 card_trace 权限', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 800);
       return;
     }
     this.loadTrace();
@@ -32,9 +26,8 @@ Page({
 
   loadTrace() {
     this.setData({ loading: true });
-    wx.cloud.callFunction({
-      name: 'getCardTrace',
-      data: { card_no: this.data.cardNo }
+    auth.callWithAuth('getCardTrace', {
+      card_no: this.data.cardNo
     }).then((res) => {
       const result = res.result || {};
       if (result.success) {
@@ -46,7 +39,6 @@ Page({
       }
     }).catch(() => {
       this.setData({ loading: false });
-      wx.showToast({ title: '请部署 getCardTrace 云函数', icon: 'none' });
     });
   },
 

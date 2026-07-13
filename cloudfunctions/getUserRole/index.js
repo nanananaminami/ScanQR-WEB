@@ -1,54 +1,63 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
+const _ = db.command;
 
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext();
-  const openid = wxContext.OPENID;
-
-  if (!openid) {
-    return { success: false, code: 'NO_OPENID', msg: '无法获取用户身份' };
+// 会话鉴权中间件：根据 session_token 解析当前用户、角色与权限
+async function authenticate(event) {
+  const token = event.session_token;
+  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
+  const sessionRes = await db.collection('sys_sessions').where({
+    session_token: token,
+    expires_at: _.gt(new Date())
+  }).get();
+  if (sessionRes.data.length === 0) {
+    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
   }
-
+  const session = sessionRes.data[0];
+  let user = null;
   try {
-    // 查询用户是否已存在
-    const userRes = await db.collection('sys_users').where({ openid }).get();
+    const userRes = await db.collection('sys_users').doc(session.user_id).get();
+    user = userRes.data;
+  } catch (e) {
+    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
+  }
+  if (!user || user.status === 'disabled') {
+    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
+  }
+  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
+  const role = roleRes.data[0] || null;
+  const permissions = (role && role.permissions) || [];
+  db.collection('sys_sessions').doc(session._id).update({
+    data: { last_active: db.serverDate() }
+  }).catch(() => {});
+  return { ok: true, user, role, role_id: user.role_id, permissions, session };
+}
 
-    if (userRes.data.length > 0) {
-      const user = userRes.data[0];
-      if (user.role === 'disabled') {
-        return { success: false, code: 'DISABLED', msg: '账号已被禁用，请联系管理员' };
-      }
-      // 更新最后登录时间
-      await db.collection('sys_users').doc(user._id).update({
-        data: { last_login: db.serverDate() }
-      });
-      return { success: true, role: user.role, user: user };
+// 根据会话令牌返回当前登录用户信息（角色 + 权限）
+exports.main = async (event, context) => {
+  try {
+    const auth = await authenticate(event);
+    if (!auth.ok) {
+      return { success: false, code: auth.code, msg: auth.msg };
     }
-
-    // 新用户：自动注册。首任用户自动成为管理员（bootstrap 机制）
-    const countRes = await db.collection('sys_users').count();
-    const isFirstUser = countRes.total === 0;
-
-    const newUser = {
-      openid: openid,
-      name: isFirstUser ? '系统管理员' : '新员工' + openid.slice(-4),
-      role: isFirstUser ? 'admin' : 'operator',
-      phone: '',
-      status: 'active',
-      created_at: db.serverDate(),
-      last_login: db.serverDate()
+    const safeUser = {
+      _id: auth.user._id,
+      username: auth.user.username,
+      real_name: auth.user.real_name || '',
+      department: auth.user.department || '',
+      phone: auth.user.phone || '',
+      role_id: auth.user.role_id,
+      status: auth.user.status,
+      created_at: auth.user.created_at,
+      last_login: auth.user.last_login
     };
-
-    const addRes = await db.collection('sys_users').add({ data: newUser });
-    newUser._id = addRes._id;
-
     return {
       success: true,
-      role: newUser.role,
-      user: newUser,
-      is_new_user: true,
-      is_first_admin: isFirstUser
+      user: safeUser,
+      role: (auth.role && auth.role.role_name) || auth.user.role_id,
+      role_id: auth.user.role_id,
+      permissions: auth.permissions
     };
   } catch (err) {
     return { success: false, code: 'ERROR', msg: '获取用户信息失败', error: err };
