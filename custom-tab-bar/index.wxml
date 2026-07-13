@@ -1,0 +1,11 @@
+<view class="tab-bar" wx:if="{{list.length > 0}}">
+  <view
+    wx:for="{{list}}"
+    wx:key="pagePath"
+    class="tab-bar__item {{selected === index ? 'tab-bar__item--active' : ''}}"
+    data-index="{{index}}"
+    bindtap="onTap">
+    <t-icon name="{{item.icon}}" size="44rpx" />
+    <text class="tab-bar__text">{{item.text}}</text>
+  </view>
+</view>

@@ -1,0 +1,49 @@
+<t-navbar title="管理看板" />
+
+<view class="dashboard">
+  <view class="dashboard__header">
+    <view class="dashboard__greeting">欢迎回来，{{userName}}</view>
+    <view class="dashboard__subtitle">车间实时数据看板</view>
+  </view>
+
+  <view class="dashboard__loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="stats-grid">
+      <view class="stat-card stat-card--blue">
+        <view class="stat-card__value">{{stats.todayScans}}</view>
+        <view class="stat-card__label">今日扫码</view>
+      </view>
+      <view class="stat-card stat-card--green">
+        <view class="stat-card__value">{{stats.activeCards}}</view>
+        <view class="stat-card__label">在制卡片</view>
+      </view>
+      <view class="stat-card stat-card--orange">
+        <view class="stat-card__value">{{stats.lockedCards}}</view>
+        <view class="stat-card__label">锁定中</view>
+      </view>
+      <view class="stat-card stat-card--red">
+        <view class="stat-card__value">{{stats.todayExceptions}}</view>
+        <view class="stat-card__label">今日异常</view>
+      </view>
+    </view>
+
+    <view class="total-bar">
+      <text>累计报工总数</text>
+      <text class="total-bar__num">{{stats.totalLogs}}</text>
+    </view>
+
+    <view class="quick-actions">
+      <view class="quick-action" bindtap="goScan">
+        <t-icon name="scan" size="48rpx" />
+        <text>扫码报工</text>
+      </view>
+      <view class="quick-action" bindtap="goCards">
+        <t-icon name="view-list" size="48rpx" />
+        <text>在制管理</text>
+      </view>
+    </view>
+  </block>
+</view>

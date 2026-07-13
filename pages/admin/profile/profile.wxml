@@ -1,0 +1,34 @@
+<t-navbar title="我的" />
+
+<view class="profile-page">
+  <view class="profile-header">
+    <view class="profile-avatar">{{user.name ? user.name[0] : '?'}}</view>
+    <view class="profile-info">
+      <view class="profile-name">{{user.name || '未登录'}}</view>
+      <t-tag theme="{{role === 'admin' ? 'primary' : 'default'}}" variant="light" size="small">
+        {{role === 'admin' ? '管理员' : '操作员'}}
+      </t-tag>
+    </view>
+  </view>
+
+  <view class="profile-section">
+    <t-cell-group theme="card">
+      <t-cell title="身份角色" note="{{role === 'admin' ? '管理员' : '操作员'}}" />
+      <t-cell title="OpenID" note="{{openidShort}}" />
+      <t-cell title="注册时间" note="{{createdText}}" />
+    </t-cell-group>
+  </view>
+
+  <view class="profile-section">
+    <t-cell-group theme="card">
+      <t-cell title="扫码报工" arrow hover bind:click="goScan" />
+      <t-cell wx:if="{{role === 'admin'}}" title="在制卡片管理" arrow hover bind:click="goCards" />
+      <t-cell wx:if="{{role === 'admin'}}" title="人员管理" arrow hover bind:click="goUsers" />
+      <t-cell title="清除本地缓存" arrow hover bind:click="clearCache" />
+    </t-cell-group>
+  </view>
+
+  <view class="profile-footer">
+    <text>车间流程卡报工系统 v1.0</text>
+  </view>
+</view>

@@ -1,6 +1,6 @@
 {
   "libVersion": "3.16.2",
-  "projectname": "ScanQR",
+  "projectname": "ScanQR-WEB",
   "setting": {
     "urlCheck": false,
     "coverView": true,
@@ -18,5 +18,6 @@
     "checkInvalidKey": true,
     "useIsolateContext": true,
     "ignoreDevUnusedFiles": true
-  }
+  },
+  "condition": {}
 }

@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "生命周期追溯",
+  "usingComponents": {
+    "t-loading": "tdesign-miniprogram/loading/loading",
+    "t-empty": "tdesign-miniprogram/empty/empty",
+    "t-tag": "tdesign-miniprogram/tag/tag"
+  }
+}

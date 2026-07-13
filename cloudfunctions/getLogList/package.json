@@ -1,0 +1,9 @@
+{
+  "name": "getLogList",
+  "version": "1.0.0",
+  "description": "报工日志台账查询（支持关键词+状态筛选+分页）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

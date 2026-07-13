@@ -45,7 +45,7 @@
   },
   "compileType": "miniprogram",
   "cloudfunctionRoot": "cloudfunctions/",
-  "libVersion": "3.6.3",
+  "libVersion": "3.16.2",
   "appid": "wxf36bd476d3ff9b6d",
   "projectname": "TDesign",
   "simulatorType": "wechat",

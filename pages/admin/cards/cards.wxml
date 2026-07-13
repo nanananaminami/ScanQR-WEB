@@ -1,0 +1,50 @@
+<t-navbar title="在制卡片管理" />
+
+<view class="cards-page">
+  <view class="filter-bar">
+    <view class="filter-bar__item {{filter === 'all' ? 'filter-bar__item--active' : ''}}" data-filter="all" bindtap="onFilterChange">全部</view>
+    <view class="filter-bar__item {{filter === 'locked' ? 'filter-bar__item--active' : ''}}" data-filter="locked" bindtap="onFilterChange">仅锁定</view>
+  </view>
+
+  <view class="cards-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="card-list" wx:if="{{filteredCards.length > 0}}">
+      <view class="card-item" wx:for="{{filteredCards}}" wx:key="_id">
+        <view class="card-item__header">
+          <view class="card-item__no">{{item.card_no}}</view>
+          <t-tag theme="{{item.is_locked ? 'warning' : 'success'}}" variant="light" size="small">
+            {{item.lockedText}}
+          </t-tag>
+        </view>
+        <view class="card-item__name">{{item.prod_name}}</view>
+        <view class="card-item__row">
+          <text class="card-item__label">工段</text>
+          <text class="card-item__value">{{item.current_step}}</text>
+        </view>
+        <view class="card-item__row" wx:if="{{item.is_locked}}">
+          <text class="card-item__label">持有人</text>
+          <text class="card-item__value">{{item.locked_by || '未知'}}</text>
+        </view>
+        <view class="card-item__row" wx:if="{{item.is_locked}}">
+          <text class="card-item__label">锁定时间</text>
+          <text class="card-item__value">{{item.lockTimeText}}</text>
+        </view>
+        <view class="card-item__action">
+          <t-button theme="default" size="small" variant="text" data-card-no="{{item.card_no}}" bind:tap="goTrace">
+            追溯
+          </t-button>
+          <t-button wx:if="{{item.is_locked}}" theme="danger" size="small" variant="outline" data-index="{{index}}" bind:tap="confirmUnlock">
+            强制解锁
+          </t-button>
+        </view>
+      </view>
+    </view>
+
+    <view class="cards-empty" wx:else>
+      <t-empty description="{{filter === 'locked' ? '当前没有锁定的卡片' : '暂无在制卡片'}}" />
+    </view>
+  </block>
+</view>

@@ -12,6 +12,27 @@ Page({
     if (name) this.setData({ operatorName: name });
     const last = wx.getStorageSync('last_card_no');
     if (last) this.setData({ lastCardNo: last });
+    this.checkRoleRedirect();
+  },
+
+  onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().refresh();
+    }
+  },
+
+  checkRoleRedirect() {
+    if (app.globalData.roleReady) {
+      if (app.globalData.role === 'admin') {
+        wx.switchTab({ url: '/pages/admin/dashboard/dashboard' });
+      }
+    } else {
+      app.globalData.roleCallbacks.push((role) => {
+        if (role === 'admin') {
+          wx.switchTab({ url: '/pages/admin/dashboard/dashboard' });
+        }
+      });
+    }
   },
 
   handleScan() {
@@ -80,6 +101,10 @@ Page({
         showCancel: false
       });
     });
+  },
+
+  handleGenQr() {
+    wx.navigateTo({ url: '/pages/qr-gen/qr-gen' });
   },
 
   handleSetOperator() {

@@ -1,0 +1,46 @@
+<t-navbar title="报工日志台账" />
+
+<view class="logs-page">
+  <view class="logs-search">
+    <t-search
+      value="{{keyword}}"
+      placeholder="搜索卡号 / 操作员 / 工段"
+      bind:change="onSearchChange"
+      bind:submit="onSearchSubmit"
+      bind:clear="onSearchClear" />
+  </view>
+
+  <view class="filter-chips">
+    <view class="filter-chip {{statusFilter === 'all' ? 'filter-chip--active' : ''}}" data-status="all" bindtap="onFilterChange">全部</view>
+    <view class="filter-chip {{statusFilter === 'normal' ? 'filter-chip--active' : ''}}" data-status="normal" bindtap="onFilterChange">正常</view>
+    <view class="filter-chip {{statusFilter === 'cancelled' ? 'filter-chip--active' : ''}}" data-status="cancelled" bindtap="onFilterChange">放弃</view>
+    <view class="filter-chip {{statusFilter === 'force_unlock' ? 'filter-chip--active' : ''}}" data-status="force_unlock" bindtap="onFilterChange">强制解锁</view>
+  </view>
+
+  <view class="logs-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="log-list" wx:if="{{logs.length > 0}}">
+      <view class="log-item" wx:for="{{logs}}" wx:key="_id" data-card-no="{{item.card_no}}" bindtap="goTrace">
+        <view class="log-item__header">
+          <view class="log-item__card-no">{{item.card_no}}</view>
+          <t-tag theme="{{item.statusType}}" variant="light" size="small">{{item.statusText}}</t-tag>
+        </view>
+        <view class="log-item__meta">{{item.operator_name}} · {{item.step_name || '-'}}</view>
+        <view class="log-item__time">{{item.timeText}}</view>
+        <view class="log-item__form" wx:if="{{item.formSummary}}">{{item.formSummary}}</view>
+      </view>
+    </view>
+
+    <view class="logs-more" wx:if="{{loadingMore}}">
+      <t-loading theme="circular" size="32rpx" text="加载中..." />
+    </view>
+    <view class="logs-end" wx:if="{{!hasMore && logs.length > 0}}">— 已全部加载 —</view>
+
+    <view class="logs-empty" wx:if="{{logs.length === 0}}">
+      <t-empty description="暂无报工日志" />
+    </view>
+  </block>
+</view>

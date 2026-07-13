@@ -3,6 +3,13 @@
   "pages": [
     "pages/scan/scan",
     "pages/process-form/process-form",
+    "pages/qr-gen/qr-gen",
+    "pages/admin/dashboard/dashboard",
+    "pages/admin/cards/cards",
+    "pages/admin/profile/profile",
+    "pages/admin/logs/logs",
+    "pages/admin/trace/trace",
+    "pages/admin/users/users",
     "pages/home/home",
     "pages/button/button",
     "pages/button/skyline/button",
@@ -139,6 +146,19 @@
       "pages": ["indexes", "base/index", "custom/index"]
     }
   ],
+  "tabBar": {
+    "custom": true,
+    "color": "#909399",
+    "selectedColor": "#0052D9",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/admin/dashboard/dashboard", "text": "看板" },
+      { "pagePath": "pages/admin/cards/cards", "text": "在制" },
+      { "pagePath": "pages/admin/logs/logs", "text": "日志" },
+      { "pagePath": "pages/scan/scan", "text": "扫码" },
+      { "pagePath": "pages/admin/profile/profile", "text": "我的" }
+    ]
+  },
   "themeLocation": "theme.json",
   "usingComponents": {
     "t-demo": "./components/demo-block/index",

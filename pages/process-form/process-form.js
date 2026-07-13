@@ -171,6 +171,6 @@ Page({
   },
 
   goScan() {
-    wx.redirectTo({ url: '/pages/scan/scan' });
+    wx.switchTab({ url: '/pages/scan/scan' });
   }
 });

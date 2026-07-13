@@ -16,6 +16,9 @@
     <t-button theme="default" block bind:tap="handleManualInput" disabled="{{loading}}">
       手动输入卡号
     </t-button>
+    <t-button theme="default" block variant="outline" bind:tap="handleGenQr">
+      生成流程卡二维码
+    </t-button>
   </view>
 
   <view class="scan-meta">

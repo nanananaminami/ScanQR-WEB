@@ -1,0 +1,35 @@
+<t-navbar title="人员管理" leftArrow />
+
+<view class="users-page">
+  <view class="filter-chips">
+    <view class="filter-chip {{roleFilter === 'all' ? 'filter-chip--active' : ''}}" data-role="all" bindtap="onRoleFilterChange">全部</view>
+    <view class="filter-chip {{roleFilter === 'admin' ? 'filter-chip--active' : ''}}" data-role="admin" bindtap="onRoleFilterChange">管理员</view>
+    <view class="filter-chip {{roleFilter === 'operator' ? 'filter-chip--active' : ''}}" data-role="operator" bindtap="onRoleFilterChange">操作员</view>
+    <view class="filter-chip {{roleFilter === 'disabled' ? 'filter-chip--active' : ''}}" data-role="disabled" bindtap="onRoleFilterChange">已禁用</view>
+  </view>
+
+  <view class="users-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="user-list" wx:if="{{filteredUsers.length > 0}}">
+      <view class="user-item" wx:for="{{filteredUsers}}" wx:key="_id">
+        <view class="user-item__header">
+          <view class="user-item__name">{{item.name}}</view>
+          <t-tag theme="{{item.roleTagTheme}}" variant="light" size="small">{{item.roleText}}</t-tag>
+        </view>
+        <view class="user-item__openid">{{item.openidShort}}</view>
+        <view class="user-item__meta">注册时间：{{item.createdText}}</view>
+        <view class="user-item__action" data-index="{{index}}" bindtap="changeRole">
+          <text>角色管理</text>
+          <t-icon name="chevron-right" size="32rpx" />
+        </view>
+      </view>
+    </view>
+
+    <view class="users-empty" wx:else>
+      <t-empty description="暂无用户" />
+    </view>
+  </block>
+</view>

@@ -1,0 +1,9 @@
+{
+  "name": "getCardTrace",
+  "version": "1.0.0",
+  "description": "流程卡全生命周期追溯（时间轴数据）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

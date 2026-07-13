@@ -1,0 +1,48 @@
+<t-navbar title="生命周期追溯" leftArrow />
+
+<view class="trace-loading" wx:if="{{loading}}">
+  <t-loading theme="circular" size="40rpx" text="加载中..." />
+</view>
+
+<block wx:if="{{!loading}}">
+  <view class="trace-page">
+    <view class="trace-card" wx:if="{{card}}">
+      <view class="trace-card__title">{{card.prod_name || '未知产品'}}</view>
+      <view class="trace-card__row"><text class="trace-card__label">卡号</text><text class="trace-card__value">{{card.card_no}}</text></view>
+      <view class="trace-card__row"><text class="trace-card__label">当前工段</text><text class="trace-card__value">{{card.current_step || '-'}}</text></view>
+      <view class="trace-card__row">
+        <text class="trace-card__label">状态</text>
+        <t-tag theme="{{card.is_locked ? 'warning' : 'success'}}" variant="light" size="small">
+          {{card.is_locked ? '锁定中' : card.status}}
+        </t-tag>
+      </view>
+    </view>
+
+    <view class="trace-section-title" wx:if="{{logs.length > 0}}">流转记录（{{logs.length}}）</view>
+
+    <view class="timeline" wx:if="{{logs.length > 0}}">
+      <view class="timeline-item" wx:for="{{logs}}" wx:key="_id">
+        <view class="timeline-item__dot timeline-item__dot--{{item.dotType}}"></view>
+        <view class="timeline-item__line" wx:if="{{index < logs.length - 1}}"></view>
+        <view class="timeline-item__content">
+          <view class="timeline-item__header">
+            <text class="timeline-item__step">{{item.step_name || '未知工段'}}</text>
+            <t-tag theme="{{item.statusType}}" variant="light" size="small">{{item.statusText}}</t-tag>
+          </view>
+          <view class="timeline-item__row">操作员：{{item.operator_name}}</view>
+          <view class="timeline-item__row">时间：{{item.timeText}}</view>
+          <view class="timeline-item__form" wx:if="{{item.formEntries.length > 0}}">
+            <view class="timeline-item__form-row" wx:for="{{item.formEntries}}" wx:for-item="entry" wx:key="key">
+              <text class="timeline-item__form-key">{{entry.key}}</text>
+              <text class="timeline-item__form-val">{{entry.value}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="trace-empty" wx:if="{{logs.length === 0}}">
+      <t-empty description="该流程卡暂无操作记录" />
+    </view>
+  </view>
+</block>
