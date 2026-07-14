@@ -176,7 +176,8 @@ exports.main = async (event, context) => {
 
     const SEED_DICTS = [
       { dict_id: 'process_type', dict_name: '制程类型', options: ['开始注塑', '保压成型', '冷却定型', '开模取件'] },
-      { dict_id: 'defect_reason', dict_name: '不良原因', options: ['气泡', '缺料', '飞边', '变形', '尺寸超差'] }
+      { dict_id: 'defect_reason', dict_name: '不良原因', options: ['气泡', '缺料', '飞边', '变形', '尺寸超差'] },
+      { dict_id: 'process_list', dict_name: '工序列表', options: ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割', '冲压', '折弯', '焊接', '喷涂', '组装', '测试', '车削', '铣削', '磨削', '电镀', '包装', '注塑', 'CNC加工', '抛光', '清洗', '烘干', '打标', '目检', '全检', '成品入库'] }
     ];
     for (const d of SEED_DICTS) {
       const existDict = await db.collection('sys_dicts').where({ dict_id: d.dict_id }).get();

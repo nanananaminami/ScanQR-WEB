@@ -18,6 +18,10 @@ Page({
       order_no: '',
       stepsText: ''
     },
+    processList: [],
+    selectedProcesses: [],
+    showCustomInput: false,
+    customProcessText: '',
     headerForm: {},
     hasOrderNoField: false,
     creating: false
@@ -106,28 +110,52 @@ Page({
 
   // ===== 建卡 =====
   openCreate() {
-    auth.callWithAuth('getTemplateList').then((res) => {
-      const result = res.result || {};
+    wx.showLoading({ title: '加载中...' });
+    Promise.all([
+      auth.callWithAuth('getTemplateList'),
+      auth.callWithAuth('getDictList')
+    ]).then(([tplRes, dictRes]) => {
+      wx.hideLoading();
+      const result = tplRes.result || {};
       if (!result.success || !result.templates || result.templates.length === 0) {
         wx.showModal({ title: '暂无模板', content: '请先在「流程卡模板管理」中创建模板', showCancel: false });
         return;
       }
+      const dictResult = dictRes.result || {};
+      const dicts = dictResult.dicts || [];
+      const processDict = dicts.find(d => d.dict_id === 'process_list');
+      const processList = processDict ? (processDict.options || []) : [];
+
+      if (processList.length === 0) {
+        this.initProcessList();
+      }
+
       this.setData({
         templates: result.templates,
         showCreate: true,
         selectedTemplate: null,
         selectedTemplateName: '',
         createForm: { order_no: '', stepsText: '' },
+        processList: processList,
+        selectedProcesses: [],
+        showCustomInput: false,
+        customProcessText: '',
         headerForm: {},
         hasOrderNoField: false
       });
     }).catch(() => {
-      wx.showToast({ title: '加载模板失败', icon: 'none' });
+      wx.hideLoading();
+      wx.showToast({ title: '加载失败', icon: 'none' });
     });
   },
 
   closeCreate() {
-    this.setData({ showCreate: false });
+    this.setData({
+      showCreate: false,
+      selectedProcesses: [],
+      showCustomInput: false,
+      customProcessText: ''
+    });
   },
 
   pickTemplate() {
@@ -175,6 +203,70 @@ Page({
     this.setData({ ['createForm.' + field]: e.detail.value || '' });
   },
 
+  toggleProcess(e) {
+    const name = e.currentTarget.dataset.name;
+    const selected = [...this.data.selectedProcesses];
+    const idx = selected.indexOf(name);
+    if (idx !== -1) {
+      selected.splice(idx, 1);
+    } else {
+      selected.push(name);
+    }
+    this.setData({ selectedProcesses: selected });
+  },
+
+  removeProcess(e) {
+    const name = e.currentTarget.dataset.name;
+    const selected = this.data.selectedProcesses.filter(s => s !== name);
+    this.setData({ selectedProcesses: selected });
+  },
+
+  toggleCustomInput() {
+    this.setData({ showCustomInput: !this.data.showCustomInput, customProcessText: '' });
+  },
+
+  onCustomProcessInput(e) {
+    this.setData({ customProcessText: e.detail.value || '' });
+  },
+
+  addCustomProcess() {
+    const text = this.data.customProcessText.trim();
+    if (!text) {
+      wx.showToast({ title: '请输入工序名称', icon: 'none' });
+      return;
+    }
+    const selected = [...this.data.selectedProcesses];
+    if (selected.indexOf(text) !== -1) {
+      wx.showToast({ title: '该工序已添加', icon: 'none' });
+      return;
+    }
+    selected.push(text);
+    this.setData({
+      selectedProcesses: selected,
+      customProcessText: '',
+      showCustomInput: false
+    });
+  },
+
+  goManageProcesses() {
+    wx.navigateTo({ url: '/pages/admin/dicts/dicts' });
+  },
+
+  initProcessList() {
+    const defaults = ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割', '冲压', '折弯', '焊接', '喷涂', '组装', '测试', '车削', '铣削', '磨削', '电镀', '包装', '注塑', 'CNC加工', '抛光', '清洗', '烘干', '打标', '目检', '全检', '成品入库'];
+    auth.callWithAuth('adminSaveDict', {
+      dict_id: 'process_list',
+      dict_name: '工序列表',
+      options: defaults,
+      is_new: true
+    }).then((res) => {
+      const result = res.result || {};
+      if (result.success) {
+        this.setData({ processList: defaults });
+      }
+    }).catch(() => {});
+  },
+
   onHeaderFormChange(e) {
     const field = e.currentTarget.dataset.field;
     this.setData({ ['headerForm.' + field]: e.detail.value || '' });
@@ -219,7 +311,7 @@ Page({
       wx.showToast({ title: '工单号为必填', icon: 'none' });
       return;
     }
-    const steps = createForm.stepsText.split('\n').filter(s => s.trim());
+    const steps = this.data.selectedProcesses;
     if (steps.length === 0) {
       wx.showToast({ title: '请至少输入一道工序', icon: 'none' });
       return;
@@ -238,7 +330,7 @@ Page({
       const result = res.result || {};
       if (result.success) {
         const orderNo = result.order_no;
-        this.setData({ showCreate: false, statusFilter: '加工中' });
+        this.setData({ showCreate: false, statusFilter: '加工中', selectedProcesses: [], showCustomInput: false, customProcessText: '' });
         wx.showModal({
           title: '建卡成功',
           content: '流转卡「' + orderNo + '」已创建，是否立即生成二维码？',

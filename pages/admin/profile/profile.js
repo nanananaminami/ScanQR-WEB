@@ -66,6 +66,10 @@ Page({
     wx.navigateTo({ url: '/pages/admin/templates/templates' });
   },
 
+  goDicts() {
+    wx.navigateTo({ url: '/pages/admin/dicts/dicts' });
+  },
+
   handleLogout() {
     wx.showModal({
       title: '退出登录',

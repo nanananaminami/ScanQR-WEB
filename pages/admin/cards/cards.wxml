@@ -94,11 +94,51 @@
       </view>
     </block>
 
-    <!-- 工序列表：高亮分区，避免漏看 -->
-    <view class="form-row form-row--area form-row--steps">
-      <text class="form-label form-label--required">工序列表 *</text>
-      <view class="form-tip">每行一道工序，如：压印</view>
-      <t-textarea value="{{createForm.stepsText}}" placeholder="压印&#10;光刻&#10;镀AR&#10;镀Ti&#10;去胶撕膜&#10;去胶清洗&#10;切割" data-field="stepsText" autosize="{{true}}" style="min-height: 180rpx;" bind:change="onCreateFormChange" />
+    <!-- 工序列表：勾选式 -->
+    <view class="form-row form-row--steps">
+      <view class="steps-header">
+        <text class="form-label form-label--required">工序列表 *</text>
+        <text class="steps-manage" bindtap="goManageProcesses">管理工序</text>
+      </view>
+
+      <view class="steps-selected" wx:if="{{selectedProcesses.length > 0}}">
+        <view class="steps-chip steps-chip--selected" wx:for="{{selectedProcesses}}" wx:key="*this">
+          <text class="steps-chip__index">{{index + 1}}</text>
+          <text class="steps-chip__name">{{item}}</text>
+          <view class="steps-chip__del" data-name="{{item}}" catchtap="removeProcess">
+            <t-icon name="close" size="24rpx" />
+          </view>
+        </view>
+      </view>
+      <view class="steps-empty" wx:if="{{selectedProcesses.length === 0}}">
+        <t-icon name="info-circle" size="28rpx" style="color:#909399;margin-right:8rpx;" />
+        <text>请在下方选择工序（可多选，按选择顺序排列）</text>
+      </view>
+
+      <view class="steps-available" wx:if="{{processList.length > 0}}">
+        <view class="steps-chip {{selectedProcesses.indexOf(item) !== -1 ? 'steps-chip--active' : ''}}"
+              wx:for="{{processList}}" wx:key="*this"
+              data-name="{{item}}" bindtap="toggleProcess">
+          <t-icon wx:if="{{selectedProcesses.indexOf(item) !== -1}}" name="check" size="28rpx" style="margin-right:4rpx;" />
+          <text>{{item}}</text>
+        </view>
+      </view>
+      <view class="steps-no-data" wx:if="{{processList.length === 0}}">
+        <text>暂无可选工序，请先</text>
+        <text class="steps-link" bindtap="goManageProcesses">管理工序列表</text>
+        <text>添加</text>
+      </view>
+
+      <view class="steps-custom">
+        <view class="steps-custom__toggle" bindtap="toggleCustomInput">
+          <t-icon name="{{showCustomInput ? 'close' : 'add'}}" size="28rpx" style="margin-right:4rpx;" />
+          <text>自定义工序</text>
+        </view>
+        <view class="steps-custom__input" wx:if="{{showCustomInput}}">
+          <t-input value="{{customProcessText}}" placeholder="输入工序名称" bind:change="onCustomProcessInput" />
+          <t-button theme="primary" size="small" bind:tap="addCustomProcess">添加</t-button>
+        </view>
+      </view>
     </view>
   </view>
   <view class="create-panel__actions">
