@@ -35,7 +35,15 @@ Page({
     }));
     const formData = {};
     fields.forEach((f) => {
-      formData[f.field_name] = f.type === 'switch' ? false : '';
+      if (f.type === 'switch') {
+        formData[f.field_name] = false;
+      } else if (f.type === 'datetime') {
+        formData[f.field_name] = ''; // 提交时自动填充
+      } else if (f.default) {
+        formData[f.field_name] = f.default;
+      } else {
+        formData[f.field_name] = '';
+      }
     });
     this.setData({
       loading: false,
@@ -73,12 +81,43 @@ Page({
     this.setData({ ['formData.' + field]: value });
   },
 
+  // 下拉选择：弹出 action sheet 供用户选择
+  pickSelect(e) {
+    const field = e.currentTarget.dataset.field;
+    const options = e.currentTarget.dataset.options || [];
+    if (options.length === 0) {
+      wx.showToast({ title: '该字段无选项', icon: 'none' });
+      return;
+    }
+    wx.showActionSheet({
+      itemList: options,
+      success: (res) => {
+        this.setData({ ['formData.' + field]: options[res.tapIndex] });
+      }
+    });
+  },
+
+  // 为 datetime 字段生成当前时间字符串
+  fillDateTime(fields, formData) {
+    const result = Object.assign({}, formData);
+    const pad = (n) => (n < 10 ? '0' + n : '' + n);
+    const now = new Date();
+    const timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    fields.forEach((f) => {
+      if (f.type === 'datetime') {
+        result[f.field_name] = timeStr;
+      }
+    });
+    return result;
+  },
+
   submitAndUnlock() {
     const { fields, formData, cardData, operatorName, submitting } = this.data;
     if (submitting) return;
 
+    // 必填校验（datetime 跳过，提交时自动填充）
     for (const f of fields) {
-      if (f.required) {
+      if (f.required && f.type !== 'datetime') {
         const val = formData[f.field_name];
         if (val === undefined || val === null || val === '') {
           wx.showToast({ title: '请填写' + f.label, icon: 'none' });
@@ -87,13 +126,16 @@ Page({
       }
     }
 
+    // 填充 datetime 字段
+    const submitFormData = this.fillDateTime(fields, formData);
+
     this.setData({ submitting: true });
     wx.showLoading({ title: '提交中...' });
 
     auth.callWithAuth('submitAndUnlockCard', {
       card_no: cardData.card_no,
       card_id: cardData._id,
-      form_data: formData,
+      form_data: submitFormData,
       step_name: this.data.stepName,
       user_name: operatorName,
       cancelled: false
@@ -152,7 +194,6 @@ Page({
   onUnload() {
     if (this.data.submitted || !this.data.cardData) return;
     const { cardData, operatorName } = this.data;
-    // 异步释放锁，不等待返回
     auth.callWithAuth('submitAndUnlockCard', {
       card_no: cardData.card_no,
       card_id: cardData._id,

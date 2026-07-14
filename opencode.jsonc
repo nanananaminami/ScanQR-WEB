@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "shell": "pwsh",
+  "watcher": {
+    "ignore": [
+      ".cloudbase/**",
+      "node_modules/**",
+      "miniprogram_npm/**"
+    ]
+  },
+  "permission": {
+    "edit": "ask",
+    "bash": "ask",
+    "external_directory": "deny"
+  },
+  "instructions": [
+    "AGENTS.md"
+  ]
+}

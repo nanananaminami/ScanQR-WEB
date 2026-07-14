@@ -1,9 +1,13 @@
 <t-navbar title="在制卡片管理" />
 
 <view class="cards-page">
-  <view class="filter-bar">
-    <view class="filter-bar__item {{filter === 'all' ? 'filter-bar__item--active' : ''}}" data-filter="all" bindtap="onFilterChange">全部</view>
-    <view class="filter-bar__item {{filter === 'locked' ? 'filter-bar__item--active' : ''}}" data-filter="locked" bindtap="onFilterChange">仅锁定</view>
+  <view class="cards-toolbar">
+    <view class="status-tabs">
+      <view class="status-tab {{statusFilter === item ? 'status-tab--active' : ''}}"
+            wx:for="{{statusTabs}}" wx:key="*this"
+            data-status="{{item}}" bindtap="onStatusTabChange">{{item}}</view>
+    </view>
+    <t-button wx:if="{{canCreate}}" theme="primary" size="small" bind:tap="openCreate">+ 建卡</t-button>
   </view>
 
   <view class="cards-loading" wx:if="{{loading}}">
@@ -11,13 +15,14 @@
   </view>
 
   <block wx:if="{{!loading}}">
-    <view class="card-list" wx:if="{{filteredCards.length > 0}}">
-      <view class="card-item" wx:for="{{filteredCards}}" wx:key="_id">
+    <view class="card-list" wx:if="{{cards.length > 0}}">
+      <view class="card-item" wx:for="{{cards}}" wx:key="_id">
         <view class="card-item__header">
           <view class="card-item__no">{{item.card_no}}</view>
-          <t-tag theme="{{item.is_locked ? 'warning' : 'success'}}" variant="light" size="small">
-            {{item.lockedText}}
-          </t-tag>
+          <view class="card-item__tags">
+            <t-tag theme="{{item.statusTheme}}" variant="light" size="small">{{item.status}}</t-tag>
+            <t-tag wx:if="{{item.is_locked}}" theme="warning" variant="light" size="small">{{item.lockedText}}</t-tag>
+          </view>
         </view>
         <view class="card-item__name">{{item.prod_name}}</view>
         <view class="card-item__row">
@@ -36,15 +41,44 @@
           <t-button theme="default" size="small" variant="text" data-card-no="{{item.card_no}}" bind:tap="goTrace">
             追溯
           </t-button>
-          <t-button wx:if="{{item.is_locked}}" theme="danger" size="small" variant="outline" data-index="{{index}}" bind:tap="confirmUnlock">
-            强制解锁
+          <t-button theme="primary" size="small" variant="text" data-index="{{index}}" bind:tap="cardActions">
+            更多
           </t-button>
         </view>
       </view>
     </view>
 
     <view class="cards-empty" wx:else>
-      <t-empty description="{{filter === 'locked' ? '当前没有锁定的卡片' : '暂无在制卡片'}}" />
+      <t-empty description="该状态下暂无流程卡" />
+      <t-button wx:if="{{canCreate && statusFilter === '加工中'}}" theme="primary" bind:tap="openCreate" style="margin-top: 24rpx;">新建流程卡</t-button>
     </view>
   </block>
+</view>
+
+<!-- 建卡浮层 -->
+<view class="create-mask" wx:if="{{showCreate}}" bindtap="closeCreate"></view>
+<view class="create-panel" wx:if="{{showCreate}}">
+  <view class="create-panel__title">新建流程卡</view>
+  <view class="create-panel__form">
+    <view class="form-row">
+      <text class="form-label">绑定模板 *</text>
+      <view class="form-picker" bindtap="pickTemplate">
+        <text class="form-picker__text {{createTemplateName ? '' : 'form-picker__placeholder'}}">{{createTemplateName || '请选择模板'}}</text>
+        <t-icon name="chevron-right" size="32rpx" />
+      </view>
+    </view>
+    <view class="form-row">
+      <text class="form-label">流程卡号 *</text>
+      <t-input value="{{createForm.card_no}}" placeholder="如 WO-20260713-0001" data-field="card_no" bind:change="onCreateFormChange" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">产品名称 *</text>
+      <t-input value="{{createForm.prod_name}}" placeholder="如 轴承外圈加工" data-field="prod_name" bind:change="onCreateFormChange" />
+    </view>
+  </view>
+  <view class="create-panel__tip">工段将自动取自所选模板；建卡后可立即生成二维码。</view>
+  <view class="create-panel__actions">
+    <t-button theme="default" variant="outline" bind:tap="closeCreate">取消</t-button>
+    <t-button theme="primary" bind:tap="submitCreate" loading="{{creating}}">创建</t-button>
+  </view>
 </view>

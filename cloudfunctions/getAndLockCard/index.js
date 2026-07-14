@@ -103,6 +103,24 @@ exports.main = async (event, context) => {
       }
     }
 
+    // 低代码渲染预处理：为 select 字段解析字典选项，前端统一读 options 渲染
+    if (templateData && Array.isArray(templateData.fields)) {
+      const dictIds = templateData.fields
+        .filter(f => f.type === 'select' && f.dict_id)
+        .map(f => f.dict_id);
+      if (dictIds.length > 0) {
+        const dictRes = await db.collection('sys_dicts').where({ dict_id: _.in(dictIds) }).get();
+        const dictMap = {};
+        dictRes.data.forEach(d => { dictMap[d.dict_id] = d.options || []; });
+        templateData.fields = templateData.fields.map(f => {
+          if (f.type === 'select' && f.dict_id && dictMap[f.dict_id]) {
+            return Object.assign({}, f, { options: dictMap[f.dict_id] });
+          }
+          return f;
+        });
+      }
+    }
+
     return {
       success: true,
       code: 'OK',

@@ -62,6 +62,10 @@ Page({
     wx.navigateTo({ url: '/pages/admin/roles/roles' });
   },
 
+  goTemplates() {
+    wx.navigateTo({ url: '/pages/admin/templates/templates' });
+  },
+
   handleLogout() {
     wx.showModal({
       title: '退出登录',

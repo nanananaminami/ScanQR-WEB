@@ -15,6 +15,7 @@ const PERMISSION_GROUPS = [
   ]},
   { module: 'user', module_name: '人员', perms: [{ id: 'user_manage', name: '人员管理' }] },
   { module: 'role', module_name: '角色', perms: [{ id: 'role_manage', name: '角色与权限管理' }] },
+  { module: 'template', module_name: '模板', perms: [{ id: 'template_manage', name: '流程卡模板管理' }] },
   { module: 'system', module_name: '系统', perms: [{ id: 'seed_init', name: '初始化测试数据' }] }
 ];
 

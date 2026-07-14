@@ -23,26 +23,50 @@
       <view class="form-card__title">{{stepName}}填报</view>
     </view>
 
+    <!-- 低代码动态渲染引擎：根据 field.type 分发到对应组件 -->
     <block wx:for="{{fields}}" wx:key="field_name">
+      <!-- 文本输入 / 数字输入 -->
       <t-input
-        wx:if="{{item.type === 'number' || item.type === 'text'}}"
+        wx:if="{{item.type === 'input' || item.type === 'text' || item.type === 'number'}}"
         label="{{item.displayLabel}}"
         type="{{item.type === 'number' ? 'number' : 'text'}}"
         value="{{formData[item.field_name]}}"
         data-field="{{item.field_name}}"
-        placeholder="请输入"
+        placeholder="{{item.placeholder || '请输入'}}"
         bind:change="onInputChange" />
 
+      <!-- 下拉选择 -->
+      <view wx:if="{{item.type === 'select'}}" class="field-block">
+        <view class="field-block__label">{{item.displayLabel}}</view>
+        <view class="field-select" data-field="{{item.field_name}}" data-options="{{item.options}}" bindtap="pickSelect">
+          <text class="field-select__value {{formData[item.field_name] ? '' : 'field-select__placeholder'}}">
+            {{formData[item.field_name] || item.placeholder || '请选择'}}
+          </text>
+          <t-icon name="chevron-down" size="36rpx" />
+        </view>
+      </view>
+
+      <!-- 文本域 -->
       <view wx:if="{{item.type === 'textarea'}}" class="field-block">
         <view class="field-block__label">{{item.displayLabel}}</view>
         <t-textarea
           value="{{formData[item.field_name]}}"
           data-field="{{item.field_name}}"
-          placeholder="请输入"
+          placeholder="{{item.placeholder || '请输入'}}"
           autosize
           bind:change="onInputChange" />
       </view>
 
+      <!-- 时间戳（自动记录，只读展示） -->
+      <view wx:if="{{item.type === 'datetime'}}" class="field-datetime">
+        <view class="field-block__label">{{item.displayLabel}}</view>
+        <view class="field-datetime__value">
+          <t-icon name="time" size="32rpx" />
+          <text>提交时自动记录</text>
+        </view>
+      </view>
+
+      <!-- 单选（兼容旧模板） -->
       <view wx:if="{{item.type === 'radio'}}" class="field-block">
         <view class="field-block__label">{{item.displayLabel}}</view>
         <t-radio-group
@@ -58,6 +82,7 @@
         </t-radio-group>
       </view>
 
+      <!-- 开关（兼容旧模板） -->
       <view wx:if="{{item.type === 'switch'}}" class="field-switch">
         <view class="field-block__label">{{item.label}}</view>
         <t-switch

@@ -1,0 +1,9 @@
+{
+  "name": "adminSaveTemplate",
+  "version": "1.0.0",
+  "description": "新建或更新流程卡模板（低代码配置）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

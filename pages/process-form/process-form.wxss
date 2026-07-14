@@ -91,6 +91,42 @@
   margin-bottom: 0;
 }
 
+.field-select {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+}
+
+.field-select__value {
+  font-size: 28rpx;
+  color: var(--td-text-color-primary, #303133);
+}
+
+.field-select__placeholder {
+  color: var(--td-text-color-placeholder, #c0c4cc);
+}
+
+.field-datetime {
+  display: flex;
+  flex-direction: column;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--td-component-border, #f5f5f5);
+}
+
+.field-datetime:last-child {
+  border-bottom: none;
+}
+
+.field-datetime__value {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 26rpx;
+  color: var(--td-text-color-secondary, #909399);
+  margin-top: 12rpx;
+}
+
 .form-actions {
   display: flex;
   flex-direction: column;

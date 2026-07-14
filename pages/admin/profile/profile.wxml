@@ -25,6 +25,7 @@
       <t-cell wx:if="{{permissions.indexOf('card_list') !== -1}}" title="在制卡片管理" arrow hover bind:click="goCards" />
       <t-cell wx:if="{{permissions.indexOf('user_manage') !== -1}}" title="人员管理" arrow hover bind:click="goUsers" />
       <t-cell wx:if="{{permissions.indexOf('role_manage') !== -1}}" title="角色与权限管理" arrow hover bind:click="goRoles" />
+      <t-cell wx:if="{{permissions.indexOf('template_manage') !== -1}}" title="流程卡模板管理" arrow hover bind:click="goTemplates" />
       <t-cell title="退出登录" arrow hover bind:click="handleLogout" />
       <t-cell title="清除本地缓存" arrow hover bind:click="clearCache" />
     </t-cell-group>

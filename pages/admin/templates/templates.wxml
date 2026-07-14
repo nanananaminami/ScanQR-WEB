@@ -1,0 +1,34 @@
+<t-navbar title="流程卡模板" leftArrow />
+
+<view class="tpl-page">
+  <view class="tpl-toolbar">
+    <t-button theme="default" size="small" variant="outline" bind:tap="goDicts">字典管理</t-button>
+    <t-button theme="primary" size="small" bind:tap="createTemplate">+ 新建模板</t-button>
+  </view>
+
+  <view class="tpl-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="tpl-list">
+      <view class="tpl-item" wx:for="{{templates}}" wx:key="_id">
+        <view class="tpl-item__header" data-id="{{item.template_id}}" bindtap="editTemplate">
+          <view class="tpl-item__name">{{item.template_name}}</view>
+          <t-tag theme="primary" variant="light" size="small">{{item.fieldCount}} 字段</t-tag>
+        </view>
+        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate">工段：{{item.step_name}}</view>
+        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate">标识：{{item.template_id}}</view>
+        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate" wx:if="{{item.fieldSummary}}">字段：{{item.fieldSummary}}</view>
+        <view class="tpl-item__actions">
+          <text class="tpl-item__btn" data-id="{{item.template_id}}" bindtap="editTemplate">编辑</text>
+          <text class="tpl-item__btn tpl-item__btn--danger" data-id="{{item.template_id}}" data-name="{{item.template_name}}" bindtap="deleteTemplate">删除</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="tpl-empty" wx:if="{{templates.length === 0}}">
+      <t-empty description="暂无模板，点击右上角新建" />
+    </view>
+  </block>
+</view>

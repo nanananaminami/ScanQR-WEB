@@ -1,0 +1,58 @@
+<t-navbar title="数据字典" leftArrow />
+
+<view class="dicts-page">
+  <view class="dicts-toolbar">
+    <t-button theme="primary" size="small" bind:tap="openCreate">+ 新建字典</t-button>
+  </view>
+
+  <view class="dicts-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="dict-list">
+      <view class="dict-item" wx:for="{{dicts}}" wx:key="_id">
+        <view class="dict-item__header">
+          <view class="dict-item__name">{{item.dict_name}}</view>
+          <t-tag theme="primary" variant="light" size="small">{{item.options.length}} 项</t-tag>
+        </view>
+        <view class="dict-item__id">标识：{{item.dict_id}}</view>
+        <view class="dict-item__options">
+          <text class="dict-tag" wx:for="{{item.options}}" wx:for-item="opt" wx:key="*this">{{opt}}</text>
+        </view>
+        <view class="dict-item__actions">
+          <text class="dict-item__btn" data-index="{{index}}" bindtap="editDict">编辑</text>
+          <text class="dict-item__btn dict-item__btn--danger" data-index="{{index}}" bindtap="deleteDict">删除</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="dicts-empty" wx:if="{{dicts.length === 0}}">
+      <t-empty description="暂无字典，点击右上角新建" />
+    </view>
+  </block>
+</view>
+
+<!-- 字典编辑浮层 -->
+<view class="dict-mask" wx:if="{{showEdit}}" bindtap="closeEdit"></view>
+<view class="dict-panel" wx:if="{{showEdit}}">
+  <view class="dict-panel__title">{{editing ? '编辑字典' : '新建字典'}}</view>
+  <view class="dict-panel__form">
+    <view class="form-row">
+      <text class="form-label">字典标识 *</text>
+      <t-input value="{{form.dict_id}}" placeholder="如 process_type" data-field="dict_id" bind:change="onFormChange" disabled="{{editing}}" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">字典名称 *</text>
+      <t-input value="{{form.dict_name}}" placeholder="如 制程类型" data-field="dict_name" bind:change="onFormChange" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">选项（每行一个）*</text>
+      <t-textarea value="{{form.options}}" placeholder="开始注塑&#10;保压成型&#10;冷却定型" data-field="options" bind:change="onFormChange" autosize />
+    </view>
+  </view>
+  <view class="dict-panel__actions">
+    <t-button theme="default" variant="outline" bind:tap="closeEdit">取消</t-button>
+    <t-button theme="primary" bind:tap="saveDict" loading="{{saving}}">保存</t-button>
+  </view>
+</view>

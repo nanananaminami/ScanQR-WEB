@@ -1,0 +1,9 @@
+{
+  "name": "adminUpdateCardStatus",
+  "version": "1.0.0",
+  "description": "流程卡状态流转（完工/作废/恢复加工）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
