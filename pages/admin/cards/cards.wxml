@@ -1,4 +1,4 @@
-<t-navbar title="在制卡片管理" />
+<t-navbar title="在制流转卡管理" />
 
 <view class="cards-page">
   <view class="cards-toolbar">
@@ -18,16 +18,16 @@
     <view class="card-list" wx:if="{{cards.length > 0}}">
       <view class="card-item" wx:for="{{cards}}" wx:key="_id">
         <view class="card-item__header">
-          <view class="card-item__no">{{item.card_no}}</view>
+          <view class="card-item__no">{{item.orderNo}}</view>
           <view class="card-item__tags">
             <t-tag theme="{{item.statusTheme}}" variant="light" size="small">{{item.status}}</t-tag>
             <t-tag wx:if="{{item.is_locked}}" theme="warning" variant="light" size="small">{{item.lockedText}}</t-tag>
           </view>
         </view>
-        <view class="card-item__name">{{item.prod_name}}</view>
+        <view class="card-item__name">{{item.projectLabel}}</view>
         <view class="card-item__row">
-          <text class="card-item__label">工段</text>
-          <text class="card-item__value">{{item.current_step}}</text>
+          <text class="card-item__label">工序数</text>
+          <text class="card-item__value">{{item.stepCount}} 道</text>
         </view>
         <view class="card-item__row" wx:if="{{item.is_locked}}">
           <text class="card-item__label">持有人</text>
@@ -38,7 +38,7 @@
           <text class="card-item__value">{{item.lockTimeText}}</text>
         </view>
         <view class="card-item__action">
-          <t-button theme="default" size="small" variant="text" data-card-no="{{item.card_no}}" bind:tap="goTrace">
+          <t-button theme="default" size="small" variant="text" data-order-no="{{item.orderNo}}" bind:tap="goTrace">
             追溯
           </t-button>
           <t-button theme="primary" size="small" variant="text" data-index="{{index}}" bind:tap="cardActions">
@@ -49,8 +49,8 @@
     </view>
 
     <view class="cards-empty" wx:else>
-      <t-empty description="该状态下暂无流程卡" />
-      <t-button wx:if="{{canCreate && statusFilter === '加工中'}}" theme="primary" bind:tap="openCreate" style="margin-top: 24rpx;">新建流程卡</t-button>
+      <t-empty description="该状态下暂无流转卡" />
+      <t-button wx:if="{{canCreate && statusFilter === '加工中'}}" theme="primary" bind:tap="openCreate" style="margin-top: 24rpx;">新建流转卡</t-button>
     </view>
   </block>
 </view>
@@ -58,25 +58,49 @@
 <!-- 建卡浮层 -->
 <view class="create-mask" wx:if="{{showCreate}}" bindtap="closeCreate"></view>
 <view class="create-panel" wx:if="{{showCreate}}">
-  <view class="create-panel__title">新建流程卡</view>
+  <view class="create-panel__title">新建流转卡</view>
   <view class="create-panel__form">
     <view class="form-row">
-      <text class="form-label">绑定模板 *</text>
+      <text class="form-label">选择模板 *</text>
       <view class="form-picker" bindtap="pickTemplate">
-        <text class="form-picker__text {{createTemplateName ? '' : 'form-picker__placeholder'}}">{{createTemplateName || '请选择模板'}}</text>
+        <text class="form-picker__text {{selectedTemplateName ? '' : 'form-picker__placeholder'}}">{{selectedTemplateName || '请选择模板'}}</text>
         <t-icon name="chevron-right" size="32rpx" />
       </view>
     </view>
-    <view class="form-row">
-      <text class="form-label">流程卡号 *</text>
-      <t-input value="{{createForm.card_no}}" placeholder="如 WO-20260713-0001" data-field="card_no" bind:change="onCreateFormChange" />
+
+    <!-- 系统工单号：仅在模板未自带 order_no 字段时才显示 -->
+    <view class="form-row" wx:if="{{!hasOrderNoField}}">
+      <text class="form-label">工单号 *</text>
+      <t-input value="{{createForm.order_no}}" placeholder="如 A260130011" data-field="order_no" bind:change="onCreateFormChange" />
     </view>
-    <view class="form-row">
-      <text class="form-label">产品名称 *</text>
-      <t-input value="{{createForm.prod_name}}" placeholder="如 轴承外圈加工" data-field="prod_name" bind:change="onCreateFormChange" />
+
+    <!-- 动态表头字段 -->
+    <block wx:if="{{selectedTemplate}}">
+      <view class="form-row" wx:for="{{selectedTemplate.header_fields}}" wx:key="field_name">
+        <text class="form-label">{{item.label}}{{item.required ? ' *' : ''}}</text>
+        <t-input wx:if="{{item.type === 'input' || item.type === 'text'}}" value="{{headerForm[item.field_name]}}" data-field="{{item.field_name}}" placeholder="请输入" bind:change="onHeaderFormChange" />
+        <t-input wx:elif="{{item.type === 'number'}}" value="{{headerForm[item.field_name]}}" type="number" data-field="{{item.field_name}}" placeholder="0" bind:change="onHeaderFormChange" />
+        <t-textarea wx:elif="{{item.type === 'textarea'}}" value="{{headerForm[item.field_name]}}" data-field="{{item.field_name}}" placeholder="请输入" autosize="{{true}}" bind:change="onHeaderFormChange" />
+        <view wx:elif="{{item.type === 'select'}}" class="form-picker" data-field="{{item.field_name}}" bindtap="pickHeaderSelect">
+          <text class="{{headerForm[item.field_name] ? '' : 'form-picker__placeholder'}}">{{headerForm[item.field_name] || '请选择'}}</text>
+          <t-icon name="chevron-right" size="32rpx" />
+        </view>
+        <view wx:elif="{{item.type === 'datetime'}}" class="form-picker" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
+          <text class="{{headerForm[item.field_name] ? '' : 'form-picker__placeholder'}}">{{headerForm[item.field_name] || '点击记录时间'}}</text>
+          <t-icon name="time" size="32rpx" />
+        </view>
+        <!-- 当模板的 order_no 字段时，提示该值将作为卡号 -->
+        <view wx:if="{{item.field_name === 'order_no'}}" class="form-order-note">↓ 该值将作为流转卡号（扫码识别用）</view>
+      </view>
+    </block>
+
+    <!-- 工序列表：高亮分区，避免漏看 -->
+    <view class="form-row form-row--area form-row--steps">
+      <text class="form-label form-label--required">工序列表 *</text>
+      <view class="form-tip">每行一道工序，如：压印</view>
+      <t-textarea value="{{createForm.stepsText}}" placeholder="压印&#10;光刻&#10;镀AR&#10;镀Ti&#10;去胶撕膜&#10;去胶清洗&#10;切割" data-field="stepsText" autosize="{{true}}" style="min-height: 180rpx;" bind:change="onCreateFormChange" />
     </view>
   </view>
-  <view class="create-panel__tip">工段将自动取自所选模板；建卡后可立即生成二维码。</view>
   <view class="create-panel__actions">
     <t-button theme="default" variant="outline" bind:tap="closeCreate">取消</t-button>
     <t-button theme="primary" bind:tap="submitCreate" loading="{{creating}}">创建</t-button>

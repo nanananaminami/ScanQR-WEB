@@ -1,15 +1,14 @@
 const { createMatrix } = require('../../utils/qrcode.js');
 
-const QR_SIZE = 480; // canvas 物理像素基准
-const MODULE_PADDING = 2; // 留白模块数
+const QR_SIZE = 480;
+const MODULE_PADDING = 2;
 
 Page({
   data: {
     form: {
-      cardNo: '',
-      prodName: '',
-      batchNo: '',
-      stepName: ''
+      orderNo: '',
+      projectName: '',
+      batchNo: ''
     },
     canvasSize: QR_SIZE,
     qrReady: false,
@@ -18,9 +17,10 @@ Page({
   },
 
   onLoad(options) {
-    // 支持从外部带参进入预填
-    if (options.card_no) {
-      this.setData({ 'form.cardNo': decodeURIComponent(options.card_no) });
+    if (options.order_no) {
+      this.setData({ 'form.orderNo': decodeURIComponent(options.order_no) });
+    } else if (options.card_no) {
+      this.setData({ 'form.orderNo': decodeURIComponent(options.card_no) });
     }
   },
 
@@ -30,16 +30,14 @@ Page({
   },
 
   buildPayload() {
-    const { cardNo, prodName, batchNo, stepName } = this.data.form;
-    // 扫码端只解析卡号，所以编码核心为 cardNo；附带信息可扩展
-    // 这里采用「卡号」纯文本，保证 scan 页 wx.scanCode 解析一致
-    return (cardNo || '').trim();
+    const { orderNo } = this.data.form;
+    return (orderNo || '').trim();
   },
 
   handleGenerate() {
     const payload = this.buildPayload();
     if (!payload) {
-      this.showMessage('请填写流程卡号', 'warning');
+      this.showMessage('请填写工单号', 'warning');
       return;
     }
 
@@ -71,16 +69,13 @@ Page({
       const totalModules = moduleCount + MODULE_PADDING * 2;
       const pixelSize = QR_SIZE / totalModules;
 
-      // 设置画布物理尺寸
       canvas.width = QR_SIZE * dpr;
       canvas.height = QR_SIZE * dpr;
       ctx.scale(dpr, dpr);
 
-      // 白色背景
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, QR_SIZE, QR_SIZE);
 
-      // 绘制黑色模块
       ctx.fillStyle = '#000000';
       for (let row = 0; row < moduleCount; row++) {
         for (let col = 0; col < moduleCount; col++) {
@@ -125,7 +120,6 @@ Page({
       },
       fail: (err) => {
         this.setData({ saving: false });
-        // 用户拒绝授权时引导打开设置
         if (err.errMsg && err.errMsg.indexOf('auth deny') > -1) {
           wx.showModal({
             title: '需要相册权限',

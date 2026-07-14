@@ -1,20 +1,20 @@
-<t-navbar title="生成流程卡二维码" leftArrow />
+<t-navbar title="生成流转卡二维码" leftArrow />
 
 <view class="qr-page">
   <view class="qr-form-card">
-    <view class="qr-form-card__title">物料信息</view>
+    <view class="qr-form-card__title">流转卡信息</view>
     <t-input
-      label="流程卡号"
-      placeholder="如 WO-20260712-01"
-      value="{{form.cardNo}}"
-      data-field="cardNo"
+      label="工单号"
+      placeholder="如 A260130011"
+      value="{{form.orderNo}}"
+      data-field="orderNo"
       bind:change="onInputChange"
       borderless />
     <t-input
-      label="产品名称"
-      placeholder="如 轴承外圈加工"
-      value="{{form.prodName}}"
-      data-field="prodName"
+      label="项目名称"
+      placeholder="如 G2556C-L"
+      value="{{form.projectName}}"
+      data-field="projectName"
       bind:change="onInputChange"
       borderless />
     <t-input
@@ -22,13 +22,6 @@
       placeholder="选填"
       value="{{form.batchNo}}"
       data-field="batchNo"
-      bind:change="onInputChange"
-      borderless />
-    <t-input
-      label="工段"
-      placeholder="如 质检工段"
-      value="{{form.stepName}}"
-      data-field="stepName"
       bind:change="onInputChange"
       borderless />
   </view>
@@ -40,7 +33,7 @@
         id="qrCanvas"
         class="qr-preview__canvas"
         style="width:{{canvasSize}}px;height:{{canvasSize}}px;" />
-      <view class="qr-preview__label">{{form.cardNo || '流程卡'}}</view>
+      <view class="qr-preview__label">{{form.orderNo || '流转卡'}}</view>
     </view>
     <view class="qr-preview__empty" wx:else>
       <t-icon name="image" size="96rpx" />
@@ -59,7 +52,7 @@
 
   <view class="qr-tip">
     <t-icon name="info-circle" size="32rpx" />
-    <text>二维码内容为流程卡号，生成后可保存至相册打印贴附</text>
+    <text>二维码内容为工单号，生成后可保存至相册打印贴附</text>
   </view>
 </view>
 

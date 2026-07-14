@@ -81,12 +81,17 @@ Page({
 
     let formSummary = '';
     if (log.form_data && typeof log.form_data === 'object') {
-      const entries = Object.entries(log.form_data).slice(0, 3);
-      formSummary = entries.map(([k, v]) => k + ': ' + (typeof v === 'boolean' ? (v ? '是' : '否') : v)).join(' · ');
+      if (log.form_data.steps_changed) {
+        formSummary = log.form_data.steps_changed.map(c => c.step_name).join('、') + ' 已更新';
+      } else {
+        const entries = Object.entries(log.form_data).slice(0, 3);
+        formSummary = entries.map(([k, v]) => k + ': ' + (typeof v === 'boolean' ? (v ? '是' : '否') : v)).join(' · ');
+      }
     }
 
     return {
       ...log,
+      cardNoDisplay: log.order_no || log.card_no || '-',
       timeText: this.formatTime(log.submit_time),
       statusText,
       statusType,
@@ -127,8 +132,8 @@ Page({
   },
 
   goTrace(e) {
-    const cardNo = e.currentTarget.dataset.cardNo;
-    wx.navigateTo({ url: '/pages/admin/trace/trace?card_no=' + encodeURIComponent(cardNo) });
+    const orderNo = e.currentTarget.dataset.orderNo;
+    wx.navigateTo({ url: '/pages/admin/trace/trace?order_no=' + encodeURIComponent(orderNo) });
   },
 
   onPullDownRefresh() {

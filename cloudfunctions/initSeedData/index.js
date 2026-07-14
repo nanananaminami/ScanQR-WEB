@@ -8,6 +8,16 @@ function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
 }
 
+function buildStep(stepName, sort, detailFields) {
+  const step = { step_name: stepName, sort };
+  detailFields.forEach(f => {
+    const defaultVal = f.default || (f.type === 'number' ? 0 : '');
+    step['prod_' + f.field_name] = defaultVal;
+    step['qc_' + f.field_name] = defaultVal;
+  });
+  return step;
+}
+
 async function authenticate(event) {
   const token = event.session_token;
   if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
@@ -38,12 +48,11 @@ async function authenticate(event) {
   return { ok: true, user, role, role_id: user.role_id, permissions, session };
 }
 
-// 系统权限目录
 const ALL_PERMISSIONS = [
   { perm_id: 'dashboard_view', perm_name: '查看看板', module: 'dashboard' },
   { perm_id: 'card_list', perm_name: '查看在制卡片', module: 'card' },
   { perm_id: 'card_submit', perm_name: '扫码上锁/提交报工', module: 'card' },
-  { perm_id: 'card_unlock', perm_name: '强制解锁流程卡', module: 'card' },
+  { perm_id: 'card_unlock', perm_name: '强制解锁流转卡', module: 'card' },
   { perm_id: 'card_trace', perm_name: '查看生命周期追溯', module: 'card' },
   { perm_id: 'log_view', perm_name: '查看操作日志', module: 'log' },
   { perm_id: 'log_export', perm_name: '导出日志', module: 'log' },
@@ -53,7 +62,6 @@ const ALL_PERMISSIONS = [
   { perm_id: 'seed_init', perm_name: '初始化测试数据', module: 'system' }
 ];
 
-// 内置角色
 const SEED_ROLES = [
   {
     role_id: 'admin',
@@ -78,12 +86,29 @@ const SEED_ROLES = [
   }
 ];
 
+// 标准流转卡模板：表头 + 明细列
+const DEFAULT_TEMPLATE = {
+  template_id: 'TPL_FLOW_01',
+  template_name: '标准流转卡模板',
+  header_fields: [
+    { field_name: 'project_name', label: '项目名称', type: 'input', required: true, sort: 1, placeholder: '如 G2556C-L', default: '' },
+    { field_name: 'order_date', label: '开单日期', type: 'input', required: false, sort: 2, placeholder: '如 2026-07-14', default: '' },
+    { field_name: 'due_date', label: '计划交期', type: 'datetime', required: false, sort: 3, placeholder: '点击记录', default: '' }
+  ],
+  detail_fields: [
+    { field_name: 'equipment_no', label: '设备编号', type: 'input', required: false, sort: 1, width: 180, placeholder: '-', default: '' },
+    { field_name: 'fixture_no', label: '夹具号', type: 'input', required: false, sort: 2, width: 150, placeholder: '-', default: '' },
+    { field_name: 'output_qty', label: '产出量', type: 'number', required: false, sort: 3, width: 130, placeholder: '0', default: '0' },
+    { field_name: 'completion_time', label: '作业完时间', type: 'datetime', required: false, sort: 4, width: 180, placeholder: '点击记录', default: '' },
+    { field_name: 'operator', label: '作业人员', type: 'input', required: false, sort: 5, width: 150, placeholder: '-', default: '' },
+    { field_name: 'remark', label: '备注', type: 'textarea', required: false, sort: 6, width: 160, placeholder: '-', default: '' }
+  ]
+};
+
 exports.main = async (event, context) => {
   const results = { success: true, created: [], skipped: [] };
 
   try {
-    // 鉴权：初始化为敏感操作，需登录且拥有 seed_init 权限
-    // 首次部署时 sys_users 为空，无法登录，故允许「无用户时免鉴权执行」作为 bootstrap
     const userCountRes = await db.collection('sys_users').count();
     if (userCountRes.total > 0) {
       const auth = await authenticate(event);
@@ -93,7 +118,6 @@ exports.main = async (event, context) => {
       }
     }
 
-    // 1. 初始化权限目录
     for (const p of ALL_PERMISSIONS) {
       const exist = await db.collection('sys_permissions').where({ perm_id: p.perm_id }).get();
       if (exist.data.length === 0) {
@@ -106,7 +130,6 @@ exports.main = async (event, context) => {
       }
     }
 
-    // 2. 初始化角色（已存在则刷新权限，保持幂等）
     for (const r of SEED_ROLES) {
       const exist = await db.collection('sys_roles').where({ role_id: r.role_id }).get();
       if (exist.data.length === 0) {
@@ -128,7 +151,6 @@ exports.main = async (event, context) => {
       }
     }
 
-    // 3. 初始化默认管理员账号 admin / admin123
     const adminExist = await db.collection('sys_users').where({ username: 'admin' }).get();
     if (adminExist.data.length === 0) {
       const salt = crypto.randomBytes(16).toString('hex');
@@ -152,60 +174,6 @@ exports.main = async (event, context) => {
       results.skipped.push('sys_users: admin 已存在');
     }
 
-    // 4. 初始化质检工段模板
-    const existingTpl = await db.collection('process_templates').where({ template_id: 'TPL_QC_01' }).get();
-    if (existingTpl.data.length === 0) {
-      const tplRes = await db.collection('process_templates').add({
-        data: {
-          template_id: 'TPL_QC_01',
-          template_name: '质检工段填报模板',
-          step_name: '质检工段',
-          fields: [
-            { field_name: 'outer_diameter', label: '外径尺寸', type: 'number', required: true, unit: 'mm' },
-            { field_name: 'inner_diameter', label: '内径尺寸', type: 'number', required: true, unit: 'mm' },
-            { field_name: 'thickness', label: '壁厚', type: 'number', required: false, unit: 'mm' },
-            { field_name: 'appearance_result', label: '外观检查结果', type: 'radio', required: true, options: ['合格', '返修', '报废'] },
-            { field_name: 'surface_defect', label: '表面缺陷描述', type: 'textarea', required: false },
-            { field_name: 'need_rework', label: '是否需要返工', type: 'switch', required: false }
-          ],
-          created_at: db.serverDate()
-        }
-      });
-      results.created.push({ collection: 'process_templates', id: tplRes._id });
-    } else {
-      results.skipped.push('process_templates: TPL_QC_01 已存在');
-    }
-
-    // 5. 初始化测试流程卡
-    const seedCards = [
-      { card_no: 'WO-20260712-01', prod_name: '轴承外圈加工', current_step: '质检工段', template_id: 'TPL_QC_01' },
-      { card_no: 'WO-20260712-02', prod_name: '轴承内圈加工', current_step: '质检工段', template_id: 'TPL_QC_01' },
-      { card_no: 'WO-20260712-03', prod_name: '注塑样件-低代码演示', current_step: '注塑工段', template_id: 'TPL_INJECT_01' }
-    ];
-    for (const c of seedCards) {
-      const existCard = await db.collection('process_cards').where({ card_no: c.card_no }).get();
-      if (existCard.data.length === 0) {
-        const cardRes = await db.collection('process_cards').add({
-          data: {
-            card_no: c.card_no,
-            prod_name: c.prod_name,
-            current_step: c.current_step,
-            template_id: c.template_id,
-            status: '加工中',
-            is_locked: false,
-            locked_by: '',
-            locked_by_user_id: '',
-            lock_time: null,
-            created_at: db.serverDate()
-          }
-        });
-        results.created.push({ collection: 'process_cards', id: cardRes._id, card_no: c.card_no });
-      } else {
-        results.skipped.push('process_cards: ' + c.card_no + ' 已存在');
-      }
-    }
-
-    // 6. 初始化数据字典（下拉选项库）
     const SEED_DICTS = [
       { dict_id: 'process_type', dict_name: '制程类型', options: ['开始注塑', '保压成型', '冷却定型', '开模取件'] },
       { dict_id: 'defect_reason', dict_name: '不良原因', options: ['气泡', '缺料', '飞边', '变形', '尺寸超差'] }
@@ -222,33 +190,63 @@ exports.main = async (event, context) => {
       }
     }
 
-    // 7. 初始化低代码样例模板（注塑工段，演示 input/number/select/datetime/textarea）
-    const existInject = await db.collection('process_templates').where({ template_id: 'TPL_INJECT_01' }).get();
-    if (existInject.data.length === 0) {
+    // 初始化标准模板
+    const existTpl = await db.collection('process_templates').where({ template_id: DEFAULT_TEMPLATE.template_id }).get();
+    if (existTpl.data.length === 0) {
       await db.collection('process_templates').add({
-        data: {
-          template_id: 'TPL_INJECT_01',
-          template_name: '注塑工段填报模板',
-          step_name: '注塑工段',
-          fields: [
-            { field_name: 'process_type', label: '制程类型', type: 'select', required: true, dict_id: 'process_type', options: [], unit: '', placeholder: '请选择', default: '' },
-            { field_name: 'input_qty', label: '投入数量', type: 'number', required: true, unit: '件', placeholder: '请输入', default: '' },
-            { field_name: 'ok_qty', label: '良品数量', type: 'number', required: true, unit: '件', placeholder: '请输入', default: '' },
-            { field_name: 'defect_reason', label: '不良原因', type: 'select', required: false, dict_id: 'defect_reason', options: [], unit: '', placeholder: '请选择', default: '' },
-            { field_name: 'operate_time', label: '操作时间', type: 'datetime', required: false, auto_now: true, unit: '', placeholder: '自动记录', default: '' },
-            { field_name: 'remark', label: '备注', type: 'textarea', required: false, unit: '', placeholder: '请输入', default: '' }
-          ],
+        data: Object.assign({}, DEFAULT_TEMPLATE, {
           created_at: db.serverDate(),
           updated_at: db.serverDate(),
           created_by: 'system'
-        }
+        })
       });
-      results.created.push('process_templates: TPL_INJECT_01（低代码样例）');
+      results.created.push('process_templates: ' + DEFAULT_TEMPLATE.template_id);
     } else {
-      results.skipped.push('process_templates: TPL_INJECT_01 已存在');
+      results.skipped.push('process_templates: ' + DEFAULT_TEMPLATE.template_id + ' 已存在');
     }
 
-    results.msg = '初始化完成。默认管理员：admin / admin123。测试卡号：WO-20260712-01/02（质检）、WO-20260712-03（注塑低代码演示）';
+    // 初始化测试流转卡
+    const detailFields = DEFAULT_TEMPLATE.detail_fields;
+    const seedCards = [
+      {
+        order_no: 'A260130011',
+        header_data: { project_name: 'G2556C-L', order_date: '2026-07-14' },
+        stepNames: ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割']
+      },
+      {
+        order_no: 'A260130012',
+        header_data: { project_name: 'G2556D-M', order_date: '2026-07-14' },
+        stepNames: ['冲压', '折弯', '焊接', '喷涂', '组装', '测试']
+      }
+    ];
+
+    for (const c of seedCards) {
+      const existCard = await db.collection('process_cards').where({ order_no: c.order_no }).get();
+      if (existCard.data.length === 0) {
+        const builtSteps = c.stepNames.map((name, i) => buildStep(name, i + 1, detailFields));
+        const cardRes = await db.collection('process_cards').add({
+          data: {
+            order_no: c.order_no,
+            template_id: DEFAULT_TEMPLATE.template_id,
+            header_data: c.header_data,
+            steps: builtSteps,
+            warehouse_personnel: '',
+            warehouse_date: '',
+            status: '加工中',
+            is_locked: false,
+            locked_by: '',
+            locked_by_user_id: '',
+            lock_time: null,
+            created_at: db.serverDate()
+          }
+        });
+        results.created.push({ collection: 'process_cards', id: cardRes._id, order_no: c.order_no });
+      } else {
+        results.skipped.push('process_cards: ' + c.order_no + ' 已存在');
+      }
+    }
+
+    results.msg = '初始化完成。默认管理员：admin / admin123。测试工单：A260130011（7道工序）、A260130012（6道工序）。模板：TPL_FLOW_01';
     return results;
   } catch (err) {
     return { success: false, msg: '初始化失败：' + (err.errMsg || err.message || '未知错误'), error: err };

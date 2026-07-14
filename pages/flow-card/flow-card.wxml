@@ -1,0 +1,142 @@
+<t-navbar title="流转卡填报" leftArrow />
+
+<view class="fc-loading" wx:if="{{loading}}">
+  <t-loading theme="circular" size="40rpx" text="加载中..." />
+</view>
+
+<view class="fc-page" wx:if="{{!loading && cardData}}">
+
+  <!-- 1. 动态表头 -->
+  <view class="fc-header">
+    <view class="fc-header__title">流转卡</view>
+    <view class="fc-header__rows">
+      <view class="fc-header__row">
+        <text class="fc-header__label">工单号</text>
+        <text class="fc-header__value">{{orderNo}}</text>
+      </view>
+      <view wx:for="{{headerFields}}" wx:key="field_name" class="fc-header__row {{(headerFields.length % 2 === 1 && index === headerFields.length - 1) ? 'fc-header__row--full' : ''}}">
+        <text class="fc-header__label">{{item.label}}{{item.required ? ' *' : ''}}</text>
+        <t-input wx:if="{{item.type === 'input' || item.type === 'text'}}" value="{{headerData[item.field_name]}}" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '-'}}" borderless custom-style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
+        <t-input wx:elif="{{item.type === 'number'}}" value="{{headerData[item.field_name]}}" type="number" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '0'}}" borderless custom-style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
+        <t-textarea wx:elif="{{item.type === 'textarea'}}" value="{{headerData[item.field_name]}}" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '-'}}" autosize borderless custom-style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
+        <view wx:elif="{{item.type === 'select'}}" class="fc-header-select" data-field="{{item.field_name}}" data-options="{{item.options}}" bindtap="pickHeaderSelect">
+          <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || item.placeholder || '请选择'}}</text>
+          <t-icon name="chevron-down" size="28rpx" />
+        </view>
+        <view wx:elif="{{item.type === 'datetime'}}" class="fc-time-cell" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
+          <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '点击记录'}}</text>
+        </view>
+      </view>
+      <view class="fc-header__row fc-header__row--full">
+        <text class="fc-header__label">锁定人</text>
+        <text class="fc-header__value fc-header__value--lock">
+          <t-icon name="lock-on" size="28rpx" /> {{cardData.locked_by}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 2. 动态工序列表（核心：数据库有几道工序，这里就渲染几张卡） -->
+  <view class="fc-steps">
+    <view class="fc-step" wx:for="{{dynamicSteps}}" wx:key="sort" wx:for-index="mainIndex">
+
+      <!-- 工序标题 -->
+      <view class="fc-step__title">
+        <text>工序 {{mainIndex + 1}}：{{item.step_name}}</text>
+      </view>
+
+      <!-- 工序级：设备号 / 夹具号 -->
+      <view class="fc-step__devices">
+        <view class="fc-step__device">
+          <text class="fc-step__device-label">设备号</text>
+          <t-input value="{{item.device_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless custom-style="padding:0;font-size:26rpx;flex:1;" bind:change="onDeviceChange" />
+        </view>
+        <view class="fc-step__device">
+          <text class="fc-step__device-label">夹具号</text>
+          <t-input value="{{item.fixture_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless custom-style="padding:0;font-size:26rpx;flex:1;" bind:change="onFixtureChange" />
+        </view>
+      </view>
+
+      <!-- 部门级：生产 / 品质 双行 -->
+      <view class="fc-step__depts">
+        <view class="fc-dept {{subIndex === 1 ? 'fc-dept--qc' : ''}}" wx:for="{{item.depts}}" wx:for-item="dept" wx:for-index="subIndex" wx:key="dept_name">
+
+          <!-- 部门标签 -->
+          <view class="fc-dept__tag">
+            <t-tag theme="{{dept.dept_name === '生产' ? 'primary' : 'warning'}}" variant="light" size="small">{{dept.dept_name}}</t-tag>
+          </view>
+
+          <!-- 部门字段网格（列由模板 detail_fields 驱动） -->
+          <view class="fc-dept__fields">
+            <view class="fc-dept__field {{df.type === 'textarea' || df.type === 'datetime' ? 'fc-dept__field--full' : ''}}" wx:for="{{detailFields}}" wx:for-item="df" wx:key="field_name">
+
+              <text class="fc-dept__field-label">{{df.label}}</text>
+
+              <t-input wx:if="{{df.type === 'input' || df.type === 'text'}}"
+                value="{{dept[df.field_name]}}"
+                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
+                placeholder="{{df.placeholder || '-'}}" borderless custom-style="padding:0;font-size:26rpx;"
+                bind:change="onDeptFieldChange" />
+
+              <t-input wx:elif="{{df.type === 'number'}}"
+                value="{{dept[df.field_name]}}"
+                type="number"
+                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
+                placeholder="0" borderless custom-style="padding:0;font-size:26rpx;"
+                bind:change="onDeptNumberChange" />
+
+              <view wx:elif="{{df.type === 'select'}}"
+                class="fc-dept__select"
+                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" data-options="{{df.options}}"
+                bindtap="pickDeptSelect">
+                <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || df.placeholder || '请选择'}}</text>
+                <t-icon name="chevron-down" size="28rpx" />
+              </view>
+
+              <view wx:elif="{{df.type === 'datetime'}}"
+                class="fc-dept__time"
+                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
+                bindtap="fillDeptTime">
+                <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '点击记录'}}</text>
+              </view>
+
+              <t-textarea wx:elif="{{df.type === 'textarea'}}"
+                value="{{dept[df.field_name]}}"
+                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
+                placeholder="{{df.placeholder || '-'}}" autosize borderless custom-style="padding:0;font-size:24rpx;"
+                bind:change="onDeptFieldChange" />
+
+            </view>
+          </view>
+
+        </view>
+      </view>
+
+    </view>
+  </view>
+
+  <!-- 3. 入库签字 -->
+  <view class="fc-signature">
+    <view class="fc-signature__title">入库签字</view>
+    <view class="fc-signature__row">
+      <view class="fc-signature__item">
+        <text class="fc-signature__label">入库人员</text>
+        <t-input value="{{warehousePersonnel}}" placeholder="签字" borderless custom-style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehousePersonnelChange" />
+      </view>
+      <view class="fc-signature__item">
+        <text class="fc-signature__label">入库日期</text>
+        <t-input value="{{warehouseDate}}" placeholder="日期" borderless custom-style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehouseDateChange" />
+      </view>
+    </view>
+  </view>
+
+  <view class="fc-actions">
+    <t-button theme="primary" block size="large" bind:tap="submitAndUnlock" loading="{{submitting}}">提交并解锁</t-button>
+    <t-button theme="default" block bind:tap="cancelAndUnlock" disabled="{{submitting}}">放弃并解锁</t-button>
+  </view>
+</view>
+
+<view class="fc-empty" wx:if="{{!loading && !cardData}}">
+  <t-empty description="未获取到流转卡数据，请重新扫码" />
+  <t-button theme="primary" bind:tap="goScan">去扫码</t-button>
+</view>

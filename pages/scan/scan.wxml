@@ -6,7 +6,7 @@
       <t-icon name="scan" size="80rpx" />
     </view>
     <view class="scan-hero__title">扫码上锁 · 填报</view>
-    <view class="scan-hero__desc">扫描流程卡二维码，自动锁定并进入工段填报</view>
+    <view class="scan-hero__desc">扫描流转卡二维码，自动锁定并进入工序填报</view>
   </view>
 
   <view class="scan-actions">
@@ -14,21 +14,21 @@
       扫码上锁
     </t-button>
     <t-button theme="default" block bind:tap="handleManualInput" disabled="{{loading}}">
-      手动输入卡号
+      手动输入工单号
     </t-button>
     <t-button theme="default" block variant="outline" bind:tap="handleGenQr">
-      生成流程卡二维码
+      生成流转卡二维码
     </t-button>
   </view>
 
   <view class="scan-meta">
     <t-cell-group theme="card">
       <t-cell title="当前操作员" note="{{operatorName || '未设置'}}" arrow hover bind:click="handleSetOperator" />
-      <t-cell title="最近卡号" note="{{lastCardNo || '暂无'}}" />
+      <t-cell title="最近工单" note="{{lastOrderNo || '暂无'}}" />
     </t-cell-group>
   </view>
 
-  <view class="scan-tip" wx:if="{{!lastCardNo}}">
+  <view class="scan-tip" wx:if="{{!lastOrderNo}}">
     <t-icon name="info-circle" size="32rpx" />
     <text>首次使用？点击底部按钮初始化测试数据</text>
   </view>

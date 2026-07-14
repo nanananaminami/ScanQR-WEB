@@ -10,11 +10,16 @@ Page({
     statusFilter: '加工中',
     statusTabs: STATUS_TABS,
     canCreate: false,
-    // 建卡表单
     showCreate: false,
     templates: [],
-    createForm: { card_no: '', prod_name: '', template_id: '' },
-    createTemplateName: '',
+    selectedTemplate: null,
+    selectedTemplateName: '',
+    createForm: {
+      order_no: '',
+      stepsText: ''
+    },
+    headerForm: {},
+    hasOrderNoField: false,
     creating: false
   },
 
@@ -50,6 +55,9 @@ Page({
       .then((res) => {
         const cards = res.data.map((c) => ({
           ...c,
+          orderNo: c.order_no || c.card_no || '',
+          projectLabel: this.getProjectLabel(c),
+          stepCount: (c.dynamic_steps || c.steps || []).length || 0,
           lockedText: c.is_locked ? '锁定中' : '空闲',
           lockTimeText: c.lock_time ? this.formatTime(c.lock_time) : '-',
           statusTheme: c.status === '已完工' ? 'success' : (c.status === '已作废' ? 'danger' : 'primary')
@@ -60,6 +68,28 @@ Page({
         this.setData({ loading: false });
         wx.showToast({ title: '加载失败', icon: 'none' });
       });
+  },
+
+  getProjectLabel(card) {
+    const hd = card.header_data || {};
+    const projectName = card.project_name || hd.project_name || '';
+    return projectName || card.order_no || '';
+  },
+
+  buildHeaderForm(headerFields, existing) {
+    const form = {};
+    headerFields.forEach(f => {
+      const existingVal = existing[f.field_name];
+      if (existingVal !== undefined && existingVal !== null && existingVal !== '') {
+        form[f.field_name] = existingVal;
+      } else if (f.default) {
+        form[f.field_name] = f.default;
+      } else {
+        form[f.field_name] = f.type === 'number' ? 0 : '';
+      }
+      form['__dictOpt_' + f.field_name] = f.options || [];
+    });
+    return form;
   },
 
   formatTime(t) {
@@ -76,7 +106,6 @@ Page({
 
   // ===== 建卡 =====
   openCreate() {
-    // 先拉取模板列表
     auth.callWithAuth('getTemplateList').then((res) => {
       const result = res.result || {};
       if (!result.success || !result.templates || result.templates.length === 0) {
@@ -86,28 +115,59 @@ Page({
       this.setData({
         templates: result.templates,
         showCreate: true,
-        createForm: {
-          card_no: this.suggestCardNo(),
-          prod_name: '',
-          template_id: ''
-        },
-        createTemplateName: ''
+        selectedTemplate: null,
+        selectedTemplateName: '',
+        createForm: { order_no: '', stepsText: '' },
+        headerForm: {},
+        hasOrderNoField: false
       });
     }).catch(() => {
       wx.showToast({ title: '加载模板失败', icon: 'none' });
     });
   },
 
-  suggestCardNo() {
-    const d = new Date();
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    const ymd = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
-    const rand = Math.floor(Math.random() * 9000 + 1000);
-    return 'WO-' + ymd + '-' + rand;
-  },
-
   closeCreate() {
     this.setData({ showCreate: false });
+  },
+
+  pickTemplate() {
+    const templates = this.data.templates;
+    wx.showActionSheet({
+      itemList: templates.map(t => t.template_name),
+      success: (res) => {
+        const tpl = templates[res.tapIndex];
+        this.resolveTemplateSelects(tpl);
+      }
+    });
+  },
+
+  resolveTemplateSelects(tpl) {
+    const selectFields = (tpl.header_fields || []).concat(tpl.detail_fields || []).filter(f => f.type === 'select' && f.dict_id && (!f.options || f.options.length === 0));
+    const hasOrderNoField = (tpl.header_fields || []).some(f => f.field_name === 'order_no');
+    if (selectFields.length === 0) {
+      const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
+      this.setData({ selectedTemplate: tpl, selectedTemplateName: tpl.template_name, headerForm, hasOrderNoField });
+      return;
+    }
+    auth.callWithAuth('getDictList').then((res) => {
+      const result = res.result || {};
+      const dicts = result.dicts || [];
+      const dictMap = {};
+      dicts.forEach(d => { dictMap[d.dict_id] = d.options || []; });
+      selectFields.forEach(f => {
+        if (dictMap[f.dict_id]) f.options = dictMap[f.dict_id];
+      });
+      const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
+      this.setData({
+        selectedTemplate: tpl,
+        selectedTemplateName: tpl.template_name,
+        headerForm,
+        hasOrderNoField
+      });
+    }).catch(() => {
+      const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
+      this.setData({ selectedTemplate: tpl, selectedTemplateName: tpl.template_name, headerForm, hasOrderNoField });
+    });
   },
 
   onCreateFormChange(e) {
@@ -115,48 +175,78 @@ Page({
     this.setData({ ['createForm.' + field]: e.detail.value || '' });
   },
 
-  pickTemplate() {
-    const templates = this.data.templates;
+  onHeaderFormChange(e) {
+    const field = e.currentTarget.dataset.field;
+    this.setData({ ['headerForm.' + field]: e.detail.value || '' });
+  },
+
+  pickHeaderSelect(e) {
+    const field = e.currentTarget.dataset.field;
+    const options = this.data.headerForm['__dictOpt_' + field] || [];
+    if (options.length === 0) {
+      wx.showToast({ title: '无选项', icon: 'none' });
+      return;
+    }
     wx.showActionSheet({
-      itemList: templates.map(t => t.template_name + '（' + t.step_name + '）'),
+      itemList: options,
       success: (res) => {
-        const tpl = templates[res.tapIndex];
-        this.setData({
-          'createForm.template_id': tpl.template_id,
-          createTemplateName: tpl.template_name + ' · ' + tpl.step_name
-        });
+        this.setData({ ['headerForm.' + field]: options[res.tapIndex] });
       }
     });
   },
 
+  fillHeaderTime(e) {
+    const field = e.currentTarget.dataset.field;
+    const now = new Date();
+    const pad = (n) => (n < 10 ? '0' + n : '' + n);
+    const timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    this.setData({ ['headerForm.' + field]: timeStr });
+    wx.showToast({ title: '已记录时间', icon: 'success', duration: 1000 });
+  },
+
   submitCreate() {
-    const { createForm, creating } = this.data;
+    const { createForm, selectedTemplate, headerForm, hasOrderNoField, creating } = this.data;
     if (creating) return;
-    if (!createForm.card_no || !createForm.prod_name || !createForm.template_id) {
-      wx.showToast({ title: '卡号、产品名、模板必填', icon: 'none' });
+    if (!selectedTemplate) {
+      wx.showToast({ title: '请选择模板', icon: 'none' });
       return;
     }
+    // 工单号来源：模板自带 order_no 字段时取其值，否则取系统输入
+    const orderNo = hasOrderNoField
+      ? String(headerForm.order_no || '').trim()
+      : (createForm.order_no || '').trim();
+    if (!orderNo) {
+      wx.showToast({ title: '工单号为必填', icon: 'none' });
+      return;
+    }
+    const steps = createForm.stepsText.split('\n').filter(s => s.trim());
+    if (steps.length === 0) {
+      wx.showToast({ title: '请至少输入一道工序', icon: 'none' });
+      return;
+    }
+
     this.setData({ creating: true });
     wx.showLoading({ title: '创建中...' });
     auth.callWithAuth('adminCreateCard', {
-      card_no: createForm.card_no.trim(),
-      prod_name: createForm.prod_name.trim(),
-      template_id: createForm.template_id
+      order_no: orderNo,
+      template_id: selectedTemplate.template_id,
+      header_data: headerForm,
+      steps: steps
     }).then((res) => {
       wx.hideLoading();
       this.setData({ creating: false });
       const result = res.result || {};
       if (result.success) {
-        const cardNo = result.card_no;
+        const orderNo = result.order_no;
         this.setData({ showCreate: false, statusFilter: '加工中' });
         wx.showModal({
           title: '建卡成功',
-          content: '流程卡「' + cardNo + '」已创建，是否立即生成二维码？',
+          content: '流转卡「' + orderNo + '」已创建，是否立即生成二维码？',
           confirmText: '生成二维码',
           cancelText: '关闭',
           success: (r) => {
             if (r.confirm) {
-              wx.navigateTo({ url: '/pages/qr-gen/qr-gen?card_no=' + encodeURIComponent(cardNo) });
+              wx.navigateTo({ url: '/pages/qr-gen/qr-gen?order_no=' + encodeURIComponent(orderNo) });
             }
           }
         });
@@ -183,7 +273,7 @@ Page({
 
     wx.showModal({
       title: '强制解锁确认',
-      content: '将强行释放流程卡「' + card.card_no + '」的占用锁（当前持有人：' + (card.locked_by || '未知') + '），对方未提交的数据将丢失。确认继续？',
+      content: '将强行释放流转卡「' + (card.order_no || card.card_no) + '」的占用锁（当前持有人：' + (card.locked_by || '未知') + '），对方未提交的数据将丢失。确认继续？',
       confirmText: '强制解锁',
       confirmColor: '#e34d59',
       success: (res) => {
@@ -214,7 +304,6 @@ Page({
     });
   },
 
-  // 卡片操作菜单：追溯 / 强制解锁 / 完工 / 作废 / 恢复加工
   cardActions(e) {
     const index = e.currentTarget.dataset.index;
     const card = this.data.cards[index];
@@ -234,7 +323,8 @@ Page({
       success: (res) => {
         const action = items[res.tapIndex];
         if (action === '生命周期追溯') {
-          wx.navigateTo({ url: '/pages/admin/trace/trace?card_no=' + encodeURIComponent(card.card_no) });
+          const cardId = card.order_no || card.card_no;
+          wx.navigateTo({ url: '/pages/admin/trace/trace?order_no=' + encodeURIComponent(cardId) });
         } else if (action === '强制解锁') {
           this.confirmUnlock({ currentTarget: { dataset: { index } } });
         } else if (action === '标记完工') {
@@ -250,9 +340,10 @@ Page({
 
   changeStatus(card, newStatus) {
     const actionText = newStatus === '已完工' ? '标记完工' : (newStatus === '已作废' ? '作废' : '恢复加工');
+    const cardLabel = card.order_no || card.card_no;
     wx.showModal({
       title: actionText + '确认',
-      content: '确定将流程卡「' + card.card_no + '」' + actionText + '？',
+      content: '确定将流转卡「' + cardLabel + '」' + actionText + '？',
       success: (res) => {
         if (!res.confirm) return;
         wx.showLoading({ title: '处理中...' });
@@ -277,8 +368,8 @@ Page({
   },
 
   goTrace(e) {
-    const cardNo = e.currentTarget.dataset.cardNo;
-    wx.navigateTo({ url: '/pages/admin/trace/trace?card_no=' + encodeURIComponent(cardNo) });
+    const orderNo = e.currentTarget.dataset.orderNo;
+    wx.navigateTo({ url: '/pages/admin/trace/trace?order_no=' + encodeURIComponent(orderNo) });
   },
 
   onPullDownRefresh() {

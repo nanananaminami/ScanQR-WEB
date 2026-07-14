@@ -34,7 +34,7 @@ async function authenticate(event) {
 }
 
 exports.main = async (event, context) => {
-  const { card_no } = event;
+  const { order_no, card_no } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -42,18 +42,43 @@ exports.main = async (event, context) => {
       return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 card_trace 权限' };
     }
 
-    if (!card_no) {
-      return { success: false, code: 'NO_CARD_NO', msg: '缺少流程卡号' };
+    const queryId = order_no || card_no;
+    if (!queryId) {
+      return { success: false, code: 'NO_CARD_NO', msg: '缺少工单号' };
     }
 
-    const cardRes = await db.collection('process_cards').where({ card_no }).get();
+    let cardRes;
+    if (order_no) {
+      cardRes = await db.collection('process_cards').where({ order_no }).get();
+    } else {
+      cardRes = await db.collection('process_cards').where(db.command.or([
+        { card_no },
+        { order_no: card_no }
+      ])).get();
+    }
     const card = cardRes.data[0] || null;
 
-    const logsRes = await db.collection('process_logs')
-      .where({ card_no })
-      .orderBy('submit_time', 'asc')
-      .limit(100)
-      .get();
+    let logsRes;
+    if (card) {
+      logsRes = await db.collection('process_logs')
+        .where(db.command.or([
+          { order_no: card.order_no },
+          { card_no: card.order_no },
+          { card_no: card.card_no }
+        ]))
+        .orderBy('submit_time', 'asc')
+        .limit(100)
+        .get();
+    } else {
+      logsRes = await db.collection('process_logs')
+        .where(db.command.or([
+          { order_no: queryId },
+          { card_no: queryId }
+        ]))
+        .orderBy('submit_time', 'asc')
+        .limit(100)
+        .get();
+    }
 
     return {
       success: true,

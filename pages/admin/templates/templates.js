@@ -29,8 +29,12 @@ Page({
       if (result.success) {
         const templates = (result.templates || []).map(t => ({
           ...t,
-          fieldCount: (t.fields || []).length,
-          fieldSummary: (t.fields || []).slice(0, 4).map(f => f.label).join(' · ') + ((t.fields || []).length > 4 ? ' ...' : '')
+          headerCount: (t.header_fields || []).length,
+          detailCount: (t.detail_fields || []).length,
+          totalFields: (t.header_fields || []).length + (t.detail_fields || []).length,
+          headerSummary: (t.header_fields || []).slice(0, 3).map(f => f.label).join(' · ') + ((t.header_fields || []).length > 3 ? ' ...' : ''),
+          detailSummary: (t.detail_fields || []).slice(0, 3).map(f => f.label).join(' · ') + ((t.detail_fields || []).length > 3 ? ' ...' : ''),
+          step_name: t.step_name || ''
         }));
         this.setData({ templates, loading: false });
       } else {
@@ -56,7 +60,7 @@ Page({
     const name = e.currentTarget.dataset.name;
     wx.showModal({
       title: '删除模板',
-      content: '确定删除模板「' + name + '」？未被流程卡引用才可删除。',
+      content: '确定删除模板「' + name + '」？未被流转卡引用才可删除。',
       confirmColor: '#e34d59',
       success: (res) => {
         if (!res.confirm) return;

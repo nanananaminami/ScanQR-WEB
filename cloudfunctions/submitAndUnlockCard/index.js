@@ -33,8 +33,55 @@ async function authenticate(event) {
   return { ok: true, user, role, role_id: user.role_id, permissions, session };
 }
 
+// 比较新旧 dynamic_steps，收集变更明细用于日志留痕
+function collectChanges(oldSteps, newSteps, detailFields) {
+  const changes = [];
+  if (!Array.isArray(oldSteps) || !Array.isArray(newSteps)) return changes;
+  const fieldNames = (detailFields || []).map(f => f.field_name);
+
+  for (let i = 0; i < Math.min(oldSteps.length, newSteps.length); i++) {
+    const oldStep = oldSteps[i];
+    const newStep = newSteps[i];
+    const rowChanges = [];
+
+    // 工序级字段：device_no / fixture_no
+    ['device_no', 'fixture_no'].forEach(key => {
+      const oldVal = oldStep[key] || '';
+      const newVal = newStep[key] || '';
+      if (String(oldVal) !== String(newVal)) {
+        rowChanges.push({ key, old: String(oldVal), new: String(newVal) });
+      }
+    });
+
+    // 部门级字段：遍历 depts 数组
+    const oldDepts = oldStep.depts || [];
+    const newDepts = newStep.depts || [];
+    for (let d = 0; d < Math.min(oldDepts.length, newDepts.length); d++) {
+      const oldDept = oldDepts[d];
+      const newDept = newDepts[d];
+      const deptName = oldDept.dept_name || newDept.dept_name || ('部门' + (d + 1));
+      fieldNames.forEach(fn => {
+        const oldVal = (oldDept[fn] !== undefined && oldDept[fn] !== null) ? oldDept[fn] : '';
+        const newVal = (newDept[fn] !== undefined && newDept[fn] !== null) ? newDept[fn] : '';
+        if (String(oldVal) !== String(newVal)) {
+          rowChanges.push({ key: deptName + '.' + fn, old: String(oldVal), new: String(newVal) });
+        }
+      });
+    }
+
+    if (rowChanges.length > 0) {
+      changes.push({
+        step_name: oldStep.step_name || newStep.step_name,
+        sort: oldStep.sort || newStep.sort,
+        fields: rowChanges
+      });
+    }
+  }
+  return changes;
+}
+
 exports.main = async (event, context) => {
-  const { card_no, card_id, form_data, step_name, user_name, cancelled } = event;
+  const { order_no, card_id, dynamic_steps, header_data, operator_name, warehouse_personnel, warehouse_date, cancelled } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -42,24 +89,26 @@ exports.main = async (event, context) => {
       return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 card_submit 权限' };
     }
 
-    const operator = user_name || auth.user.real_name || auth.user.username || '未知操作员';
+    const operator = operator_name || auth.user.real_name || auth.user.username || '未知操作员';
 
-    // 1. 写入操作日志
-    await db.collection('process_logs').add({
-      data: {
-        card_no: card_no,
-        card_id: card_id || '',
-        operator_name: operator,
-        operator_user_id: auth.user._id,
-        operator_username: auth.user.username,
-        step_name: step_name || '',
-        form_data: form_data || {},
-        cancelled: !!cancelled,
-        submit_time: db.serverDate()
-      }
-    });
+    const cardRes = await db.collection('process_cards').doc(card_id).get();
+    if (!cardRes.data) {
+      return { success: false, code: 'NOT_FOUND', msg: '流转卡不存在' };
+    }
+    const card = cardRes.data;
 
-    // 2. 解锁流程卡 + 可选状态推进
+    let detailFields = [];
+    if (card.template_id) {
+      try {
+        const tplRes = await db.collection('process_templates').where({ template_id: card.template_id }).get();
+        if (tplRes.data.length > 0) {
+          detailFields = tplRes.data[0].detail_fields || [];
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    const oldSteps = card.dynamic_steps || card.steps || [];
+
     const updateData = {
       is_locked: false,
       locked_by: '',
@@ -68,21 +117,41 @@ exports.main = async (event, context) => {
       last_updated: db.serverDate()
     };
 
-    if (!cancelled && form_data) {
-      if (form_data.status) {
-        updateData.status = form_data.status;
-      }
+    if (!cancelled) {
+      if (Array.isArray(dynamic_steps)) updateData.dynamic_steps = dynamic_steps;
+      if (header_data) updateData.header_data = header_data;
+      if (warehouse_personnel !== undefined) updateData.warehouse_personnel = warehouse_personnel;
+      if (warehouse_date !== undefined) updateData.warehouse_date = warehouse_date;
     }
 
-    const updateRes = await db.collection('process_cards').doc(card_id).update({
-      data: updateData
-    });
+    await db.collection('process_cards').doc(card_id).update({ data: updateData });
 
-    return {
-      success: true,
-      updated: updateRes.stats.updated,
-      log_written: true
+    const changes = cancelled ? [] : collectChanges(oldSteps, dynamic_steps || [], detailFields);
+    const logData = {
+      order_no: order_no || card.order_no,
+      card_no: card.order_no || '',
+      card_id: card_id,
+      operator_name: operator,
+      operator_user_id: auth.user._id,
+      operator_username: auth.user.username,
+      step_name: '',
+      form_data: cancelled ? {} : {
+        steps_changed: changes,
+        steps_count: (dynamic_steps || []).length,
+        warehouse_personnel: warehouse_personnel || '',
+        warehouse_date: warehouse_date || ''
+      },
+      cancelled: !!cancelled,
+      submit_time: db.serverDate()
     };
+
+    if (changes.length > 0) {
+      logData.step_name = changes.map(c => c.step_name).join('、');
+    }
+
+    await db.collection('process_logs').add({ data: logData });
+
+    return { success: true, unlocked: true, log_written: true, changes_count: changes.length };
   } catch (err) {
     return { success: false, msg: '提交失败', error: err };
   }

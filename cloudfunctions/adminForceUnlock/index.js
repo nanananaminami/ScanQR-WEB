@@ -63,12 +63,13 @@ exports.main = async (event, context) => {
 
     await db.collection('process_logs').add({
       data: {
-        card_no: card.card_no,
+        order_no: card.order_no || '',
+        card_no: card.card_no || card.order_no || '',
         card_id: card_id,
         operator_name: adminName,
         operator_user_id: auth.user._id,
         operator_username: auth.user.username,
-        step_name: card.current_step || '',
+        step_name: '',
         form_data: {},
         cancelled: true,
         is_force_unlock: true,
@@ -76,7 +77,7 @@ exports.main = async (event, context) => {
       }
     });
 
-    return { success: true, msg: '已强制解锁', card_no: card.card_no };
+    return { success: true, msg: '已强制解锁', order_no: card.order_no || card.card_no };
   } catch (err) {
     return { success: false, msg: '解锁失败', error: err };
   }

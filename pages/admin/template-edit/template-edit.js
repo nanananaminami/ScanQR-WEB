@@ -1,12 +1,11 @@
 const auth = require('../../../utils/auth');
 
-// 低代码组件库：5 种基础字段类型
 const FIELD_TYPES = [
-  { type: 'input', name: '文本输入', desc: '单号、批号等' },
+  { type: 'input', name: '文本输入', desc: '编号、名称等' },
   { type: 'number', name: '数字输入', desc: '数量、良品率等' },
-  { type: 'select', name: '下拉选择', desc: '制程类型、不良原因' },
+  { type: 'select', name: '下拉选择', desc: '选项列表' },
   { type: 'textarea', name: '文本域', desc: '备注说明' },
-  { type: 'datetime', name: '时间戳', desc: '自动记录当前时间' }
+  { type: 'datetime', name: '时间日期', desc: '自动记录或选择时间' }
 ];
 
 const TYPE_NAME_MAP = {};
@@ -25,8 +24,9 @@ Page({
     isEdit: false,
     template_id: '',
     template_name: '',
-    step_name: '',
-    fields: [],
+    section: 'header',
+    headerFields: [],
+    detailFields: [],
     dicts: [],
     fieldTypes: FIELD_TYPES,
     typeNameMap: TYPE_NAME_MAP
@@ -62,11 +62,12 @@ Page({
       if (result.success) {
         const tpl = (result.templates || []).find(t => t.template_id === template_id);
         if (tpl) {
-          const fields = (tpl.fields || []).map(f => this.normalizeField(f));
+          const headerFields = (tpl.header_fields || []).map(f => this.normalizeField(f));
+          const detailFields = (tpl.detail_fields || []).map(f => this.normalizeField(f));
           this.setData({
             template_name: tpl.template_name,
-            step_name: tpl.step_name,
-            fields,
+            headerFields,
+            detailFields,
             loading: false
           });
         } else {
@@ -79,7 +80,6 @@ Page({
     }).catch(() => this.setData({ loading: false }));
   },
 
-  // 将服务端字段配置规范化为编辑器内部结构
   normalizeField(f) {
     return {
       _uid: genUid(),
@@ -87,10 +87,9 @@ Page({
       label: f.label || '',
       type: f.type || 'input',
       required: !!f.required,
-      unit: f.unit || '',
+      width: f.width || 150,
       placeholder: f.placeholder || '',
       default: f.default || '',
-      // select 选项：编辑时用换行符分隔的字符串，方便在 textarea 中编辑
       options: Array.isArray(f.options) ? f.options.join('\n') : '',
       dict_id: f.dict_id || '',
       use_dict: !!f.dict_id
@@ -101,8 +100,12 @@ Page({
     this.setData({ template_name: e.detail.value || '' });
   },
 
-  onStepChange(e) {
-    this.setData({ step_name: e.detail.value || '' });
+  switchSection(e) {
+    this.setData({ section: e.currentTarget.dataset.section });
+  },
+
+  getFieldsKey() {
+    return this.data.section === 'header' ? 'headerFields' : 'detailFields';
   },
 
   addField() {
@@ -112,7 +115,9 @@ Page({
         const type = FIELD_TYPES[res.tapIndex].type;
         const newField = this.normalizeField({ type });
         if (type === 'datetime') newField.placeholder = '自动记录提交时间';
-        this.setData({ fields: this.data.fields.concat([newField]) });
+        const key = this.getFieldsKey();
+        const fields = this.data[key];
+        this.setData({ [key]: fields.concat([newField]) });
       }
     });
   },
@@ -123,9 +128,10 @@ Page({
       itemList: FIELD_TYPES.map(t => t.name),
       success: (res) => {
         const type = FIELD_TYPES[res.tapIndex].type;
-        const field = Object.assign({}, this.data.fields[index], { type });
+        const key = this.getFieldsKey();
+        const field = Object.assign({}, this.data[key][index], { type });
         if (type === 'datetime') field.placeholder = '自动记录提交时间';
-        this.setData({ ['fields[' + index + ']']: field });
+        this.setData({ [key + '[' + index + ']']: field });
       }
     });
   },
@@ -133,19 +139,22 @@ Page({
   onFieldChange(e) {
     const index = e.currentTarget.dataset.index;
     const field = e.currentTarget.dataset.field;
-    this.setData({ ['fields[' + index + '].' + field]: e.detail.value || '' });
+    const key = this.getFieldsKey();
+    this.setData({ [key + '[' + index + '].' + field]: e.detail.value || '' });
   },
 
   onFieldRequiredChange(e) {
     const index = e.currentTarget.dataset.index;
-    this.setData({ ['fields[' + index + '].required']: e.detail.value });
+    const key = this.getFieldsKey();
+    this.setData({ [key + '[' + index + '].required']: e.detail.value });
   },
 
   onUseDictChange(e) {
     const index = e.currentTarget.dataset.index;
-    this.setData({ ['fields[' + index + '].use_dict']: e.detail.value });
+    const key = this.getFieldsKey();
+    this.setData({ [key + '[' + index + '].use_dict']: e.detail.value });
     if (!e.detail.value) {
-      this.setData({ ['fields[' + index + '].dict_id']: '' });
+      this.setData({ [key + '[' + index + '].dict_id']: '' });
     }
   },
 
@@ -160,7 +169,8 @@ Page({
       itemList: dicts.map(d => d.dict_name + '（' + d.dict_id + '）'),
       success: (res) => {
         const dict = dicts[res.tapIndex];
-        this.setData({ ['fields[' + index + '].dict_id']: dict.dict_id });
+        const key = this.getFieldsKey();
+        this.setData({ [key + '[' + index + '].dict_id']: dict.dict_id });
       }
     });
   },
@@ -168,21 +178,24 @@ Page({
   moveUp(e) {
     const index = e.currentTarget.dataset.index;
     if (index === 0) return;
-    const fields = this.data.fields.slice();
+    const key = this.getFieldsKey();
+    const fields = this.data[key].slice();
     const tmp = fields[index - 1];
     fields[index - 1] = fields[index];
     fields[index] = tmp;
-    this.setData({ fields });
+    this.setData({ [key]: fields });
   },
 
   moveDown(e) {
     const index = e.currentTarget.dataset.index;
-    if (index >= this.data.fields.length - 1) return;
-    const fields = this.data.fields.slice();
-    const tmp = fields[index + 1];
-    fields[index + 1] = fields[index];
-    fields[index] = tmp;
-    this.setData({ fields });
+    const key = this.getFieldsKey();
+    const fields = this.data[key];
+    if (index >= fields.length - 1) return;
+    const arr = fields.slice();
+    const tmp = arr[index + 1];
+    arr[index + 1] = arr[index];
+    arr[index] = tmp;
+    this.setData({ [key]: arr });
   },
 
   removeField(e) {
@@ -192,49 +205,52 @@ Page({
       content: '确定删除该字段？',
       success: (res) => {
         if (!res.confirm) return;
-        const fields = this.data.fields.slice();
+        const key = this.getFieldsKey();
+        const fields = this.data[key].slice();
         fields.splice(index, 1);
-        this.setData({ fields });
+        this.setData({ [key]: fields });
       }
     });
   },
 
-  saveTemplate() {
-    const { template_name, step_name, fields, isEdit, template_id, saving } = this.data;
-    if (saving) return;
-    if (!template_name || !step_name) {
-      wx.showToast({ title: '请填写模板名和工段', icon: 'none' });
-      return;
-    }
-
-    // 校验并清洗字段
-    const cleanFields = [];
+  validateFields(fields) {
     const seenNames = {};
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
       if (!f.field_name || !f.label) {
         wx.showToast({ title: '第' + (i + 1) + '个字段缺少变量名或标签', icon: 'none' });
-        return;
+        return false;
       }
       if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(f.field_name)) {
         wx.showToast({ title: '变量名非法：' + f.field_name, icon: 'none' });
-        return;
+        return false;
       }
       if (seenNames[f.field_name]) {
         wx.showToast({ title: '变量名重复：' + f.field_name, icon: 'none' });
-        return;
+        return false;
       }
       seenNames[f.field_name] = true;
+    }
+    return true;
+  },
 
+  cleanFields(fields, isDetail) {
+    return fields.map(f => {
       const clean = {
         field_name: f.field_name,
         label: f.label,
         type: f.type,
         required: !!f.required,
-        unit: f.unit || '',
+        sort: 0,
         placeholder: f.placeholder || '',
         default: f.default || ''
       };
+      if (isDetail) {
+        clean.width = f.width || 150;
+      }
+      if (f.type === 'datetime') {
+        clean.auto_now = true;
+      }
       if (f.type === 'select') {
         if (f.use_dict && f.dict_id) {
           clean.dict_id = f.dict_id;
@@ -243,14 +259,27 @@ Page({
           clean.options = (f.options || '').split('\n').map(s => s.trim()).filter(s => s);
           clean.dict_id = '';
           if (clean.options.length === 0) {
-            wx.showToast({ title: f.label + ' 需配置选项或字典', icon: 'none' });
-            return;
+            return null;
           }
         }
       }
-      if (f.type === 'datetime') clean.auto_now = true;
-      cleanFields.push(clean);
+      return clean;
+    }).filter(f => f !== null);
+  },
+
+  saveTemplate() {
+    const { template_name, headerFields, detailFields, isEdit, template_id, saving } = this.data;
+    if (saving) return;
+    if (!template_name) {
+      wx.showToast({ title: '请填写模板名', icon: 'none' });
+      return;
     }
+
+    if (!this.validateFields(headerFields)) return;
+    if (!this.validateFields(detailFields)) return;
+
+    const cleanHeader = this.cleanFields(headerFields, false);
+    const cleanDetail = this.cleanFields(detailFields, true);
 
     const finalId = template_id || ('TPL_' + Date.now());
     this.setData({ saving: true });
@@ -258,8 +287,8 @@ Page({
     auth.callWithAuth('adminSaveTemplate', {
       template_id: finalId,
       template_name,
-      step_name,
-      fields: cleanFields,
+      header_fields: cleanHeader,
+      detail_fields: cleanDetail,
       is_new: !isEdit
     }).then((res) => {
       wx.hideLoading();

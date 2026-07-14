@@ -15,11 +15,11 @@
       <view class="tpl-item" wx:for="{{templates}}" wx:key="_id">
         <view class="tpl-item__header" data-id="{{item.template_id}}" bindtap="editTemplate">
           <view class="tpl-item__name">{{item.template_name}}</view>
-          <t-tag theme="primary" variant="light" size="small">{{item.fieldCount}} 字段</t-tag>
+          <t-tag theme="primary" variant="light" size="small">{{item.totalFields}} 字段</t-tag>
         </view>
-        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate">工段：{{item.step_name}}</view>
         <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate">标识：{{item.template_id}}</view>
-        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate" wx:if="{{item.fieldSummary}}">字段：{{item.fieldSummary}}</view>
+        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate" wx:if="{{item.headerCount > 0}}">表头（{{item.headerCount}}）：{{item.headerSummary}}</view>
+        <view class="tpl-item__meta" data-id="{{item.template_id}}" bindtap="editTemplate" wx:if="{{item.detailCount > 0}}">明细（{{item.detailCount}}）：{{item.detailSummary}}</view>
         <view class="tpl-item__actions">
           <text class="tpl-item__btn" data-id="{{item.template_id}}" bindtap="editTemplate">编辑</text>
           <text class="tpl-item__btn tpl-item__btn--danger" data-id="{{item.template_id}}" data-name="{{item.template_name}}" bindtap="deleteTemplate">删除</text>

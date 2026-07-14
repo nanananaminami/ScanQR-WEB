@@ -9,85 +9,114 @@
     <view class="te-card">
       <view class="te-row">
         <text class="te-label">模板名称 *</text>
-        <t-input value="{{template_name}}" placeholder="如 轴承外圈-注塑工段" bind:change="onNameChange" />
-      </view>
-      <view class="te-row">
-        <text class="te-label">工段名称 *</text>
-        <t-input value="{{step_name}}" placeholder="如 注塑工段" bind:change="onStepChange" />
+        <t-input value="{{template_name}}" placeholder="如 标准流转卡模板" bind:change="onNameChange" />
       </view>
     </view>
 
-    <view class="te-section-title">字段配置（{{fields.length}}）</view>
-
-    <view class="te-field" wx:for="{{fields}}" wx:key="_uid">
-      <view class="te-field__head">
-        <view class="te-field__type" data-index="{{index}}" bindtap="changeFieldType">
-          <text>{{typeNameMap[item.type]}}</text>
-          <t-icon name="chevron-down" size="28rpx" />
-        </view>
-        <view class="te-field__mover">
-          <text class="te-field__move" data-index="{{index}}" bindtap="moveUp">↑</text>
-          <text class="te-field__move" data-index="{{index}}" bindtap="moveDown">↓</text>
-          <text class="te-field__del" data-index="{{index}}" bindtap="removeField">删除</text>
-        </view>
+    <!-- 表头 / 明细 切换 -->
+    <view class="te-tabs">
+      <view class="te-tab {{section === 'header' ? 'te-tab--active' : ''}}" data-section="header" bindtap="switchSection">
+        表头字段（{{headerFields.length}}）
       </view>
-
-      <view class="te-row">
-        <text class="te-label">标签 *</text>
-        <t-input value="{{item.label}}" placeholder="如 投入数量" data-index="{{index}}" data-field="label" bind:change="onFieldChange" />
-      </view>
-      <view class="te-row">
-        <text class="te-label">变量名 *</text>
-        <t-input value="{{item.field_name}}" placeholder="如 input_qty" data-index="{{index}}" data-field="field_name" bind:change="onFieldChange" />
-      </view>
-
-      <view class="te-row te-row--inline" wx:if="{{item.type !== 'datetime'}}">
-        <text class="te-label">必填</text>
-        <t-switch value="{{item.required}}" data-index="{{index}}" bind:change="onFieldRequiredChange" />
-      </view>
-
-      <view class="te-row" wx:if="{{item.type === 'input' || item.type === 'number'}}">
-        <text class="te-label">单位</text>
-        <t-input value="{{item.unit}}" placeholder="如 mm" data-index="{{index}}" data-field="unit" bind:change="onFieldChange" />
-      </view>
-
-      <view class="te-row" wx:if="{{item.type !== 'datetime'}}">
-        <text class="te-label">占位提示</text>
-        <t-input value="{{item.placeholder}}" placeholder="请输入" data-index="{{index}}" data-field="placeholder" bind:change="onFieldChange" />
-      </view>
-
-      <!-- 下拉选择：字典或自定义选项 -->
-      <block wx:if="{{item.type === 'select'}}">
-        <view class="te-row te-row--inline">
-          <text class="te-label">使用字典</text>
-          <t-switch value="{{item.use_dict}}" data-index="{{index}}" bind:change="onUseDictChange" />
-        </view>
-        <view class="te-row" wx:if="{{item.use_dict}}">
-          <text class="te-label">选择字典</text>
-          <view class="te-picker" data-index="{{index}}" bindtap="pickDict">
-            <text>{{item.dict_id || '请选择'}}</text>
-            <t-icon name="chevron-right" size="32rpx" />
-          </view>
-        </view>
-        <view class="te-row" wx:if="{{!item.use_dict}}">
-          <text class="te-label">选项（每行一个）</text>
-          <t-textarea value="{{item.options}}" placeholder="选项1&#10;选项2" data-index="{{index}}" data-field="options" bind:change="onFieldChange" autosize />
-        </view>
-      </block>
-
-      <!-- 时间戳说明 -->
-      <view class="te-tip" wx:if="{{item.type === 'datetime'}}">
-        提交时自动记录当前时间，工人无需手动填写
+      <view class="te-tab {{section === 'detail' ? 'te-tab--active' : ''}}" data-section="detail" bindtap="switchSection">
+        明细字段（{{detailFields.length}}）
       </view>
     </view>
+    <view class="te-tab-hint" wx:if="{{section === 'header'}}">配置流转卡上方的静态信息字段（如项目名称、图号、交期等）</view>
+    <view class="te-tab-hint" wx:if="{{section === 'detail'}}">配置工序明细表的列，每列自动按"生产"/"品质"双行生成</view>
 
-    <view class="te-add" bindtap="addField">
-      <t-icon name="add" size="36rpx" />
-      <text>添加字段</text>
-    </view>
+    <!-- 字段列表（表头与明细共用模板） -->
+    <block wx:if="{{section === 'header'}}">
+      <template is="field-list" data="{{fields: headerFields, section: 'header'}}" />
+      <view class="te-add" bindtap="addField">
+        <t-icon name="add" size="36rpx" />
+        <text>添加表头字段</text>
+      </view>
+    </block>
+
+    <block wx:if="{{section === 'detail'}}">
+      <template is="field-list" data="{{fields: detailFields, section: 'detail'}}" />
+      <view class="te-add" bindtap="addField">
+        <t-icon name="add" size="36rpx" />
+        <text>添加明细字段</text>
+      </view>
+    </block>
 
     <view class="te-actions">
       <t-button theme="primary" block bind:tap="saveTemplate" loading="{{saving}}">保存模板</t-button>
     </view>
   </block>
 </view>
+
+<!-- 字段卡片模板 -->
+<template name="field-list">
+  <view class="te-field" wx:for="{{fields}}" wx:key="_uid">
+    <view class="te-field__head">
+      <view class="te-field__type" data-index="{{index}}" bindtap="changeFieldType">
+        <text>{{typeNameMap[item.type]}}</text>
+        <t-icon name="chevron-down" size="28rpx" />
+      </view>
+      <view class="te-field__mover">
+        <text class="te-field__move" data-index="{{index}}" bindtap="moveUp">↑</text>
+        <text class="te-field__move" data-index="{{index}}" bindtap="moveDown">↓</text>
+        <text class="te-field__del" data-index="{{index}}" bindtap="removeField">删除</text>
+      </view>
+    </view>
+
+    <view class="te-row">
+      <text class="te-label">标签 *</text>
+      <t-input value="{{item.label}}" placeholder="如 项目名称" data-index="{{index}}" data-field="label" bind:change="onFieldChange" />
+    </view>
+    <view class="te-row">
+      <text class="te-label">变量名 *</text>
+      <t-input value="{{item.field_name}}" placeholder="如 project_name" data-index="{{index}}" data-field="field_name" bind:change="onFieldChange" />
+    </view>
+
+    <view class="te-row te-row--inline" wx:if="{{item.type !== 'datetime'}}">
+      <text class="te-label">必填</text>
+      <t-switch value="{{item.required}}" data-index="{{index}}" bind:change="onFieldRequiredChange" />
+    </view>
+
+    <!-- 明细额外：列宽 -->
+    <view class="te-row" wx:if="{{section === 'detail'}}">
+      <text class="te-label">列宽（rpx）</text>
+      <t-input value="{{item.width}}" type="number" placeholder="如 180" data-index="{{index}}" data-field="width" bind:change="onFieldChange" />
+    </view>
+
+    <!-- 占位提示（非datetime） -->
+    <view class="te-row" wx:if="{{item.type !== 'datetime'}}">
+      <text class="te-label">占位提示</text>
+      <t-input value="{{item.placeholder}}" placeholder="请输入" data-index="{{index}}" data-field="placeholder" bind:change="onFieldChange" />
+    </view>
+
+    <!-- 默认值 -->
+    <view class="te-row">
+      <text class="te-label">默认值</text>
+      <t-input value="{{item.default}}" placeholder="如 默认值" data-index="{{index}}" data-field="default" bind:change="onFieldChange" />
+    </view>
+
+    <!-- 下拉选择：字典或自定义选项 -->
+    <block wx:if="{{item.type === 'select'}}">
+      <view class="te-row te-row--inline">
+        <text class="te-label">使用字典</text>
+        <t-switch value="{{item.use_dict}}" data-index="{{index}}" bind:change="onUseDictChange" />
+      </view>
+      <view class="te-row" wx:if="{{item.use_dict}}">
+        <text class="te-label">选择字典</text>
+        <view class="te-picker" data-index="{{index}}" bindtap="pickDict">
+          <text>{{item.dict_id || '请选择'}}</text>
+          <t-icon name="chevron-right" size="32rpx" />
+        </view>
+      </view>
+      <view class="te-row" wx:if="{{!item.use_dict}}">
+        <text class="te-label">选项（每行一个）</text>
+        <t-textarea value="{{item.options}}" placeholder="选项1&#10;选项2" data-index="{{index}}" data-field="options" bind:change="onFieldChange" autosize />
+      </view>
+    </block>
+
+    <!-- 时间戳说明 -->
+    <view class="te-tip" wx:if="{{item.type === 'datetime'}}">
+      提交时自动记录当前时间，工人无需手动填写
+    </view>
+  </view>
+</template>

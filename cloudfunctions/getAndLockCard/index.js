@@ -36,7 +36,7 @@ async function authenticate(event) {
 }
 
 exports.main = async (event, context) => {
-  const { card_no, user_name } = event;
+  const { order_no, user_name } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -44,17 +44,16 @@ exports.main = async (event, context) => {
       return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 card_submit 权限' };
     }
 
-    if (!card_no) {
-      return { success: false, code: 'NO_CARD_NO', msg: '缺少流程卡号' };
+    if (!order_no) {
+      return { success: false, code: 'NO_ORDER_NO', msg: '缺少工单号' };
     }
 
     const operator = user_name || auth.user.real_name || auth.user.username || '未知操作员';
     const operatorUserId = auth.user._id;
     const now = new Date();
 
-    // 第一步：原子上锁
     let lockRes = await db.collection('process_cards').where({
-      card_no: card_no,
+      order_no: order_no,
       is_locked: false
     }).update({
       data: {
@@ -65,10 +64,9 @@ exports.main = async (event, context) => {
       }
     });
 
-    // 第二步：抢占超时锁
     if (lockRes.stats.updated === 0) {
       lockRes = await db.collection('process_cards').where({
-        card_no: card_no,
+        order_no: order_no,
         is_locked: true,
         lock_time: _.lt(new Date(now.getTime() - LOCK_TIMEOUT_MS))
       }).update({
@@ -82,49 +80,54 @@ exports.main = async (event, context) => {
     }
 
     if (lockRes.stats.updated === 0) {
-      const existRes = await db.collection('process_cards').where({ card_no }).get();
+      const existRes = await db.collection('process_cards').where({ order_no }).get();
       if (existRes.data.length === 0) {
-        return { success: false, code: 'NOT_FOUND', msg: '未找到流程卡：' + card_no };
+        return { success: false, code: 'NOT_FOUND', msg: '未找到流转卡：' + order_no };
       }
       const holder = existRes.data[0].locked_by || '他人';
-      return { success: false, code: 'LOCKED', msg: '该流程卡正由「' + holder + '」编辑中，请稍后再试' };
+      return { success: false, code: 'LOCKED', msg: '该流转卡正由「' + holder + '」编辑中，请稍后再试' };
     }
 
-    const cardRes = await db.collection('process_cards').where({ card_no }).get();
-    const targetCard = cardRes.data[0];
+    const cardRes = await db.collection('process_cards').where({ order_no }).get();
+    const cardData = cardRes.data[0];
 
     let templateData = null;
-    if (targetCard.template_id) {
+    if (cardData.template_id) {
       try {
-        const tplRes = await db.collection('process_templates').doc(targetCard.template_id).get();
-        templateData = tplRes.data;
+        const tplRes = await db.collection('process_templates').where({ template_id: cardData.template_id }).get();
+        if (tplRes.data.length > 0) {
+          templateData = tplRes.data[0];
+
+          const allSelectFields = [
+            ...(templateData.header_fields || []).filter(f => f.type === 'select' && f.dict_id),
+            ...(templateData.detail_fields || []).filter(f => f.type === 'select' && f.dict_id)
+          ];
+          const dictIds = [...new Set(allSelectFields.map(f => f.dict_id))];
+          if (dictIds.length > 0) {
+            const dictRes = await db.collection('sys_dicts').where({ dict_id: _.in(dictIds) }).get();
+            const dictMap = {};
+            dictRes.data.forEach(d => { dictMap[d.dict_id] = d.options || []; });
+
+            const resolveSelects = (fields) => fields.map(f => {
+              if (f.type === 'select' && f.dict_id && dictMap[f.dict_id]) {
+                return Object.assign({}, f, { options: dictMap[f.dict_id] });
+              }
+              return f;
+            });
+
+            templateData.header_fields = resolveSelects(templateData.header_fields || []);
+            templateData.detail_fields = resolveSelects(templateData.detail_fields || []);
+          }
+        }
       } catch (e) {
         templateData = null;
-      }
-    }
-
-    // 低代码渲染预处理：为 select 字段解析字典选项，前端统一读 options 渲染
-    if (templateData && Array.isArray(templateData.fields)) {
-      const dictIds = templateData.fields
-        .filter(f => f.type === 'select' && f.dict_id)
-        .map(f => f.dict_id);
-      if (dictIds.length > 0) {
-        const dictRes = await db.collection('sys_dicts').where({ dict_id: _.in(dictIds) }).get();
-        const dictMap = {};
-        dictRes.data.forEach(d => { dictMap[d.dict_id] = d.options || []; });
-        templateData.fields = templateData.fields.map(f => {
-          if (f.type === 'select' && f.dict_id && dictMap[f.dict_id]) {
-            return Object.assign({}, f, { options: dictMap[f.dict_id] });
-          }
-          return f;
-        });
       }
     }
 
     return {
       success: true,
       code: 'OK',
-      cardData: targetCard,
+      cardData: cardData,
       templateData: templateData,
       operator: operator
     };

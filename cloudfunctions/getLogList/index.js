@@ -47,6 +47,7 @@ exports.main = async (event, context) => {
     if (keyword) {
       andParts.push(_.or([
         { card_no: db.RegExp({ regexp: keyword, options: 'i' }) },
+        { order_no: db.RegExp({ regexp: keyword, options: 'i' }) },
         { operator_name: db.RegExp({ regexp: keyword, options: 'i' }) },
         { step_name: db.RegExp({ regexp: keyword, options: 'i' }) }
       ]));

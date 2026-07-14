@@ -3,7 +3,7 @@ const auth = require('../../utils/auth');
 Page({
   data: {
     loading: false,
-    lastCardNo: '',
+    lastOrderNo: '',
     operatorName: ''
   },
 
@@ -13,13 +13,12 @@ Page({
       wx.showModal({ title: '无权限', content: '缺少 card_submit 权限，无法扫码报工', showCancel: false });
       return;
     }
-    // 默认使用当前登录用户的姓名作为操作员
     const session = auth.getSession() || {};
     const defaultName = (session.user && (session.user.real_name || session.user.username)) || '操作员';
     const name = wx.getStorageSync('operator_name') || defaultName;
     this.setData({ operatorName: name });
-    const last = wx.getStorageSync('last_card_no');
-    if (last) this.setData({ lastCardNo: last });
+    const last = wx.getStorageSync('last_order_no');
+    if (last) this.setData({ lastOrderNo: last });
   },
 
   onShow() {
@@ -37,12 +36,12 @@ Page({
     wx.scanCode({
       onlyFromCamera: false,
       success: (res) => {
-        const cardNo = (res.result || '').trim();
-        if (!cardNo) {
+        const orderNo = (res.result || '').trim();
+        if (!orderNo) {
           wx.showToast({ title: '扫码内容为空', icon: 'error' });
           return;
         }
-        this.lockCard(cardNo);
+        this.lockCard(orderNo);
       },
       fail: () => {}
     });
@@ -51,9 +50,9 @@ Page({
   handleManualInput() {
     if (this.data.loading) return;
     wx.showModal({
-      title: '手动输入流程卡号',
+      title: '手动输入工单号',
       editable: true,
-      placeholderText: '如 WO-20260712-01',
+      placeholderText: '如 A260130011',
       success: (res) => {
         if (res.confirm && res.content) {
           this.lockCard(res.content.trim());
@@ -62,13 +61,13 @@ Page({
     });
   },
 
-  lockCard(cardNo) {
+  lockCard(orderNo) {
     this.setData({ loading: true });
     const operatorName = this.data.operatorName || '操作员';
     const app = getApp();
 
     auth.callWithAuth('getAndLockCard', {
-      card_no: cardNo,
+      order_no: orderNo,
       user_name: operatorName
     }).then((res) => {
       this.setData({ loading: false });
@@ -79,10 +78,10 @@ Page({
           templateData: result.templateData,
           operator: operatorName
         };
-        wx.setStorageSync('last_card_no', cardNo);
-        this.setData({ lastCardNo: cardNo });
+        wx.setStorageSync('last_order_no', orderNo);
+        this.setData({ lastOrderNo: orderNo });
         wx.navigateTo({
-          url: '/pages/process-form/process-form?card_no=' + encodeURIComponent(cardNo)
+          url: '/pages/flow-card/flow-card?order_no=' + encodeURIComponent(orderNo)
         });
       } else {
         wx.showModal({
@@ -127,7 +126,7 @@ Page({
     }
     wx.showModal({
       title: '初始化测试数据',
-      content: '将创建质检模板与样例流程卡（若已初始化则跳过）。是否继续？',
+      content: '将创建样例流转卡与基础数据。是否继续？',
       success: (res) => {
         if (!res.confirm) return;
         wx.showLoading({ title: '初始化中...' });

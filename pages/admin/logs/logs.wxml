@@ -4,7 +4,7 @@
   <view class="logs-search">
     <t-search
       value="{{keyword}}"
-      placeholder="搜索卡号 / 操作员 / 工段"
+      placeholder="搜索工单号 / 操作员 / 工序"
       bind:change="onSearchChange"
       bind:submit="onSearchSubmit"
       bind:clear="onSearchClear" />
@@ -23,9 +23,9 @@
 
   <block wx:if="{{!loading}}">
     <view class="log-list" wx:if="{{logs.length > 0}}">
-      <view class="log-item" wx:for="{{logs}}" wx:key="_id" data-card-no="{{item.card_no}}" bindtap="goTrace">
+      <view class="log-item" wx:for="{{logs}}" wx:key="_id" data-order-no="{{item.cardNoDisplay}}" bindtap="goTrace">
         <view class="log-item__header">
-          <view class="log-item__card-no">{{item.card_no}}</view>
+          <view class="log-item__card-no">{{item.cardNoDisplay}}</view>
           <t-tag theme="{{item.statusType}}" variant="light" size="small">{{item.statusText}}</t-tag>
         </view>
         <view class="log-item__meta">{{item.operator_name}} · {{item.step_name || '-'}}</view>

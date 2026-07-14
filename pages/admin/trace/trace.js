@@ -5,12 +5,17 @@ Page({
     loading: true,
     cardNo: '',
     card: null,
-    logs: []
+    logs: [],
+    stepCount: 0,
+    projectName: '',
+    headerEntries: []
   },
 
   onLoad(options) {
+    const orderNo = options.order_no ? decodeURIComponent(options.order_no) : '';
     const cardNo = options.card_no ? decodeURIComponent(options.card_no) : '';
-    this.setData({ cardNo });
+    const queryId = orderNo || cardNo;
+    this.setData({ cardNo: queryId });
     if (!auth.requireLogin()) return;
     this.checkAndLoad();
   },
@@ -26,13 +31,21 @@ Page({
 
   loadTrace() {
     this.setData({ loading: true });
+    const queryId = this.data.cardNo;
     auth.callWithAuth('getCardTrace', {
-      card_no: this.data.cardNo
+      order_no: queryId
     }).then((res) => {
       const result = res.result || {};
       if (result.success) {
         const logs = (result.logs || []).map((log) => this.formatLog(log));
-        this.setData({ card: result.card, logs, loading: false });
+        const card = result.card || {};
+        const stepCount = Array.isArray(card.steps) ? card.steps.length : 0;
+        const headerData = card.header_data || {};
+        const headerEntries = Object.entries(headerData).map(([key, value]) => ({
+          key, value: String(value || '')
+        }));
+        const projectName = headerData.project_name || card.project_name || card.prod_name || card.order_no || '';
+        this.setData({ card, logs, loading: false, stepCount, projectName, headerEntries });
       } else {
         this.setData({ loading: false });
         wx.showToast({ title: result.msg || '加载失败', icon: 'none' });
@@ -62,10 +75,20 @@ Page({
 
     let formEntries = [];
     if (log.form_data && typeof log.form_data === 'object') {
-      formEntries = Object.entries(log.form_data).map(([key, value]) => ({
-        key: key,
-        value: typeof value === 'boolean' ? (value ? '是' : '否') : String(value || '')
-      })).filter((e) => e.value !== '');
+      if (log.form_data.steps_changed && log.form_data.steps_changed.length > 0) {
+        formEntries = [{
+          key: '变更工序',
+          value: log.form_data.steps_changed.map(c => {
+            const changes = c.fields.map(f => f.key + ': ' + f.old + ' → ' + f.new).join('; ');
+            return c.step_name + '(' + changes + ')';
+          }).join(' | ')
+        }];
+      } else {
+        formEntries = Object.entries(log.form_data).map(([key, value]) => ({
+          key: key,
+          value: typeof value === 'boolean' ? (value ? '是' : '否') : String(value || '')
+        })).filter((e) => e.value !== '');
+      }
     }
 
     return {

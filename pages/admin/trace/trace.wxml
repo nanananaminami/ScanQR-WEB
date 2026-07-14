@@ -7,9 +7,13 @@
 <block wx:if="{{!loading}}">
   <view class="trace-page">
     <view class="trace-card" wx:if="{{card}}">
-      <view class="trace-card__title">{{card.prod_name || '未知产品'}}</view>
-      <view class="trace-card__row"><text class="trace-card__label">卡号</text><text class="trace-card__value">{{card.card_no}}</text></view>
-      <view class="trace-card__row"><text class="trace-card__label">当前工段</text><text class="trace-card__value">{{card.current_step || '-'}}</text></view>
+      <view class="trace-card__title">{{projectName || '未知项目'}}</view>
+      <view class="trace-card__row"><text class="trace-card__label">工单号</text><text class="trace-card__value">{{card.order_no || card.card_no}}</text></view>
+      <view class="trace-card__row" wx:for="{{headerEntries}}" wx:key="key" wx:for-item="entry">
+        <text class="trace-card__label">{{entry.key}}</text>
+        <text class="trace-card__value">{{entry.value || '-'}}</text>
+      </view>
+      <view class="trace-card__row"><text class="trace-card__label">工序数</text><text class="trace-card__value">{{stepCount}} 道</text></view>
       <view class="trace-card__row">
         <text class="trace-card__label">状态</text>
         <t-tag theme="{{card.is_locked ? 'warning' : 'success'}}" variant="light" size="small">
@@ -26,7 +30,7 @@
         <view class="timeline-item__line" wx:if="{{index < logs.length - 1}}"></view>
         <view class="timeline-item__content">
           <view class="timeline-item__header">
-            <text class="timeline-item__step">{{item.step_name || '未知工段'}}</text>
+            <text class="timeline-item__step">{{item.step_name || '流转卡操作'}}</text>
             <t-tag theme="{{item.statusType}}" variant="light" size="small">{{item.statusText}}</t-tag>
           </view>
           <view class="timeline-item__row">操作员：{{item.operator_name}}</view>
@@ -42,7 +46,7 @@
     </view>
 
     <view class="trace-empty" wx:if="{{logs.length === 0}}">
-      <t-empty description="该流程卡暂无操作记录" />
+      <t-empty description="该流转卡暂无操作记录" />
     </view>
   </view>
 </block>

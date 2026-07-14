@@ -156,6 +156,11 @@
   gap: 8rpx;
 }
 
+.form-tip {
+  font-size: 22rpx;
+  color: var(--td-text-color-placeholder, #c0c4cc);
+}
+
 .form-label {
   font-size: 24rpx;
   color: var(--td-text-color-secondary, #909399);
@@ -178,6 +183,28 @@
 
 .form-picker__placeholder {
   color: var(--td-text-color-placeholder, #c0c4cc);
+}
+
+/* 模板自带 order_no 字段时的提示 */
+.form-order-note {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--td-brand-color-7, #0052d9);
+  line-height: 1.4;
+}
+
+/* 工序列表高亮分区，避免漏看 */
+.form-row--steps {
+  background: rgba(0, 82, 217, 0.04);
+  border: 2rpx dashed #0052D9;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  margin-top: 16rpx;
+}
+
+.form-label--required {
+  color: var(--td-brand-color-7, #0052d9);
+  font-weight: 600;
 }
 
 .create-panel__tip {

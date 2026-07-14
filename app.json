@@ -4,6 +4,7 @@
     "pages/login/login",
     "pages/scan/scan",
     "pages/process-form/process-form",
+    "pages/flow-card/flow-card",
     "pages/qr-gen/qr-gen",
     "pages/admin/dashboard/dashboard",
     "pages/admin/cards/cards",
