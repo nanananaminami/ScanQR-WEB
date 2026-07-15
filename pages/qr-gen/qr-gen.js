@@ -22,6 +22,11 @@ Page({
     } else if (options.card_no) {
       this.setData({ 'form.orderNo': decodeURIComponent(options.card_no) });
     }
+    // 自动生成：建卡后带 auto=1 跳转，无需手动点"生成"
+    if (options.auto === '1' && this.data.form.orderNo) {
+      this.setData({ qrReady: true });
+      setTimeout(() => this.handleGenerate(), 200);
+    }
   },
 
   onInputChange(e) {
@@ -136,11 +141,6 @@ Page({
   },
 
   showMessage(content, theme) {
-    const message = this.selectComponent('#t-message');
-    if (message) {
-      message.show({ content, theme: theme || 'info', duration: 2000 });
-    } else {
-      wx.showToast({ title: content, icon: 'none' });
-    }
+    wx.showToast({ title: content, icon: theme === 'success' ? 'success' : (theme === 'error' ? 'error' : 'none') });
   }
 });

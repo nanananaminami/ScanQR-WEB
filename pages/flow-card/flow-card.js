@@ -79,7 +79,19 @@ Page({
     dynamicSteps: [],
     warehousePersonnel: '',
     warehouseDate: '',
-    operatorName: ''
+    operatorName: '',
+    datePickerVisible: false,
+    datePickerValue: '',
+    datePickerTarget: null,
+    showSearchSelect: false,
+    searchSelectField: '',
+    searchSelectLabel: '',
+    searchSelectOptions: [],
+    searchSelectValue: '',
+    searchSelectMainIndex: -1,
+    searchSelectSubIndex: -1,
+    searchKeyword: '',
+    filteredOptions: []
   },
 
   onLoad(options) {
@@ -152,19 +164,63 @@ Page({
     this.setData({ ['headerData.' + field]: e.detail.value });
   },
 
-  pickHeaderSelect(e) {
-    const field = e.currentTarget.dataset.field;
-    const options = e.currentTarget.dataset.options || [];
-    if (options.length === 0) {
-      wx.showToast({ title: '无选项', icon: 'none' });
-      return;
+  openSearchSelect(e) {
+    const { field, mainindex, subindex, options } = e.currentTarget.dataset;
+    let currentValue = '';
+    let label = field;
+    if (mainindex !== undefined && subindex !== undefined) {
+      const dept = (this.data.dynamicSteps[mainindex] || {}).depts || [];
+      currentValue = (dept[subindex] || {})[field] || '';
+    } else {
+      const hf = this.data.headerFields.find(x => x.field_name === field);
+      label = (hf && hf.label) || field;
+      currentValue = this.data.headerData[field] || '';
     }
-    wx.showActionSheet({
-      itemList: options,
-      success: (res) => {
-        this.setData({ ['headerData.' + field]: options[res.tapIndex] });
-      }
+    const opts = options || [];
+    this.setData({
+      showSearchSelect: true,
+      searchSelectField: field,
+      searchSelectLabel: label,
+      searchSelectOptions: opts,
+      searchSelectValue: currentValue,
+      searchSelectMainIndex: mainindex !== undefined ? mainindex : -1,
+      searchSelectSubIndex: subindex !== undefined ? subindex : -1,
+      searchKeyword: '',
+      filteredOptions: opts
     });
+  },
+
+  closeSearchSelect() {
+    this.setData({ showSearchSelect: false });
+  },
+
+  onSearchKeywordChange(e) {
+    const keyword = (e.detail.value || '').toLowerCase().trim();
+    const opts = this.data.searchSelectOptions;
+    const filtered = keyword
+      ? opts.filter(o => String(o).toLowerCase().indexOf(keyword) !== -1)
+      : opts;
+    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
+  },
+
+  clearSearchKeyword() {
+    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
+  },
+
+  selectSearchOption(e) {
+    const value = e.currentTarget.dataset.value;
+    const { searchSelectField, searchSelectMainIndex, searchSelectSubIndex } = this.data;
+    if (searchSelectMainIndex !== -1 && searchSelectSubIndex !== -1) {
+      this.setData({
+        ['dynamicSteps[' + searchSelectMainIndex + '].depts[' + searchSelectSubIndex + '].' + searchSelectField]: value,
+        showSearchSelect: false
+      });
+    } else {
+      this.setData({
+        ['headerData.' + searchSelectField]: value,
+        showSearchSelect: false
+      });
+    }
   },
 
   fillHeaderTime(e) {
@@ -195,25 +251,49 @@ Page({
     this.setData({ ['dynamicSteps[' + mainindex + '].depts[' + subindex + '].' + field]: Number(e.detail.value) || 0 });
   },
 
-  pickDeptSelect(e) {
-    const { mainindex, subindex, field } = e.currentTarget.dataset;
-    const options = e.currentTarget.dataset.options || [];
-    if (options.length === 0) {
-      wx.showToast({ title: '无选项', icon: 'none' });
-      return;
-    }
-    wx.showActionSheet({
-      itemList: options,
-      success: (res) => {
-        this.setData({ ['dynamicSteps[' + mainindex + '].depts[' + subindex + '].' + field]: options[res.tapIndex] });
-      }
-    });
-  },
-
   fillDeptTime(e) {
     const { mainindex, subindex, field } = e.currentTarget.dataset;
     this.setData({ ['dynamicSteps[' + mainindex + '].depts[' + subindex + '].' + field]: nowStr() });
     wx.showToast({ title: '已记录时间', icon: 'success', duration: 1000 });
+  },
+
+  openDatePicker(e) {
+    const { field, mainindex, subindex } = e.currentTarget.dataset;
+    let currentValue = '';
+    if (mainindex !== undefined && subindex !== undefined) {
+      const dept = (this.data.dynamicSteps[mainindex] || {}).depts || [];
+      currentValue = (dept[subindex] || {})[field] || '';
+    } else {
+      currentValue = this.data.headerData[field] || '';
+    }
+    this.setData({
+      datePickerVisible: true,
+      datePickerValue: currentValue,
+      datePickerTarget: { field, mainIndex: mainindex, subIndex: subindex }
+    });
+  },
+
+  onDatePickerConfirm(e) {
+    const target = this.data.datePickerTarget;
+    if (!target) return;
+    const value = e.detail.value;
+    if (target.mainIndex !== undefined && target.subIndex !== undefined) {
+      this.setData({
+        ['dynamicSteps[' + target.mainIndex + '].depts[' + target.subIndex + '].' + target.field]: value,
+        datePickerVisible: false,
+        datePickerTarget: null
+      });
+    } else {
+      this.setData({
+        ['headerData.' + target.field]: value,
+        datePickerVisible: false,
+        datePickerTarget: null
+      });
+    }
+  },
+
+  onDatePickerCancel() {
+    this.setData({ datePickerVisible: false, datePickerTarget: null });
   },
 
   // ===== 入库 =====

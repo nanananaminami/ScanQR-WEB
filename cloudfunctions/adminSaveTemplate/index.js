@@ -53,7 +53,7 @@ function cleanField(f) {
     }
   }
   if (f.type === 'datetime') {
-    clean.auto_now = true;
+    clean.auto_now = f.auto_now !== undefined ? f.auto_now : true;
   }
   return clean;
 }
@@ -79,7 +79,7 @@ function cleanDetailField(f) {
     }
   }
   if (f.type === 'datetime') {
-    clean.auto_now = true;
+    clean.auto_now = f.auto_now !== undefined ? f.auto_now : true;
   }
   return clean;
 }

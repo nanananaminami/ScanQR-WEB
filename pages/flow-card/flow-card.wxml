@@ -11,20 +11,27 @@
     <view class="fc-header__title">流转卡</view>
     <view class="fc-header__rows">
       <view class="fc-header__row">
-        <text class="fc-header__label">工单号</text>
+        <text class="fc-header__label">流程卡号</text>
         <text class="fc-header__value">{{orderNo}}</text>
+      </view>
+      <view class="fc-header__row" wx:if="{{cardData.work_order_no}}">
+        <text class="fc-header__label">工单号</text>
+        <text class="fc-header__value">{{cardData.work_order_no}}</text>
       </view>
       <view wx:for="{{headerFields}}" wx:key="field_name" class="fc-header__row {{(headerFields.length % 2 === 1 && index === headerFields.length - 1) ? 'fc-header__row--full' : ''}}">
         <text class="fc-header__label">{{item.label}}{{item.required ? ' *' : ''}}</text>
-        <t-input wx:if="{{item.type === 'input' || item.type === 'text'}}" value="{{headerData[item.field_name]}}" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '-'}}" borderless custom-style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
-        <t-input wx:elif="{{item.type === 'number'}}" value="{{headerData[item.field_name]}}" type="number" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '0'}}" borderless custom-style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
-        <t-textarea wx:elif="{{item.type === 'textarea'}}" value="{{headerData[item.field_name]}}" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '-'}}" autosize borderless custom-style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
-        <view wx:elif="{{item.type === 'select'}}" class="fc-header-select" data-field="{{item.field_name}}" data-options="{{item.options}}" bindtap="pickHeaderSelect">
+        <t-input wx:if="{{item.type === 'input' || item.type === 'text'}}" value="{{headerData[item.field_name]}}" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '-'}}" borderless style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
+        <t-input wx:elif="{{item.type === 'number'}}" value="{{headerData[item.field_name]}}" type="number" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '0'}}" borderless style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
+        <t-textarea wx:elif="{{item.type === 'textarea'}}" value="{{headerData[item.field_name]}}" data-field="{{item.field_name}}" placeholder="{{item.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:26rpx;" bind:change="onHeaderInputChange" />
+        <view wx:elif="{{item.type === 'select'}}" class="fc-header-select" data-field="{{item.field_name}}" data-options="{{item.options}}" bindtap="openSearchSelect">
           <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || item.placeholder || '请选择'}}</text>
           <t-icon name="chevron-down" size="28rpx" />
         </view>
-        <view wx:elif="{{item.type === 'datetime'}}" class="fc-time-cell" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
+        <view wx:elif="{{item.type === 'datetime' && item.auto_now !== false}}" class="fc-time-cell" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
           <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '点击记录'}}</text>
+        </view>
+        <view wx:elif="{{item.type === 'datetime' && item.auto_now === false}}" class="fc-time-cell" data-field="{{item.field_name}}" bindtap="openDatePicker">
+          <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '选择时间'}}</text>
         </view>
       </view>
       <view class="fc-header__row fc-header__row--full">
@@ -49,11 +56,11 @@
       <view class="fc-step__devices">
         <view class="fc-step__device">
           <text class="fc-step__device-label">设备号</text>
-          <t-input value="{{item.device_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless custom-style="padding:0;font-size:26rpx;flex:1;" bind:change="onDeviceChange" />
+          <t-input value="{{item.device_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless style="padding:0;font-size:26rpx;flex:1;" bind:change="onDeviceChange" />
         </view>
         <view class="fc-step__device">
           <text class="fc-step__device-label">夹具号</text>
-          <t-input value="{{item.fixture_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless custom-style="padding:0;font-size:26rpx;flex:1;" bind:change="onFixtureChange" />
+          <t-input value="{{item.fixture_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless style="padding:0;font-size:26rpx;flex:1;" bind:change="onFixtureChange" />
         </view>
       </view>
 
@@ -75,35 +82,41 @@
               <t-input wx:if="{{df.type === 'input' || df.type === 'text'}}"
                 value="{{dept[df.field_name]}}"
                 data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                placeholder="{{df.placeholder || '-'}}" borderless custom-style="padding:0;font-size:26rpx;"
+                placeholder="{{df.placeholder || '-'}}" borderless style="padding:0;font-size:26rpx;"
                 bind:change="onDeptFieldChange" />
 
               <t-input wx:elif="{{df.type === 'number'}}"
                 value="{{dept[df.field_name]}}"
                 type="number"
                 data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                placeholder="0" borderless custom-style="padding:0;font-size:26rpx;"
+                placeholder="0" borderless style="padding:0;font-size:26rpx;"
                 bind:change="onDeptNumberChange" />
 
               <view wx:elif="{{df.type === 'select'}}"
                 class="fc-dept__select"
                 data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" data-options="{{df.options}}"
-                bindtap="pickDeptSelect">
+                bindtap="openSearchSelect">
                 <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || df.placeholder || '请选择'}}</text>
                 <t-icon name="chevron-down" size="28rpx" />
               </view>
 
-              <view wx:elif="{{df.type === 'datetime'}}"
+              <view wx:elif="{{df.type === 'datetime' && df.auto_now !== false}}"
                 class="fc-dept__time"
                 data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
                 bindtap="fillDeptTime">
                 <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '点击记录'}}</text>
               </view>
+              <view wx:elif="{{df.type === 'datetime' && df.auto_now === false}}"
+                class="fc-dept__time"
+                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
+                bindtap="openDatePicker">
+                <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '选择时间'}}</text>
+              </view>
 
               <t-textarea wx:elif="{{df.type === 'textarea'}}"
                 value="{{dept[df.field_name]}}"
                 data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                placeholder="{{df.placeholder || '-'}}" autosize borderless custom-style="padding:0;font-size:24rpx;"
+                placeholder="{{df.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:24rpx;"
                 bind:change="onDeptFieldChange" />
 
             </view>
@@ -121,11 +134,11 @@
     <view class="fc-signature__row">
       <view class="fc-signature__item">
         <text class="fc-signature__label">入库人员</text>
-        <t-input value="{{warehousePersonnel}}" placeholder="签字" borderless custom-style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehousePersonnelChange" />
+        <t-input value="{{warehousePersonnel}}" placeholder="签字" borderless style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehousePersonnelChange" />
       </view>
       <view class="fc-signature__item">
         <text class="fc-signature__label">入库日期</text>
-        <t-input value="{{warehouseDate}}" placeholder="日期" borderless custom-style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehouseDateChange" />
+        <t-input value="{{warehouseDate}}" placeholder="日期" borderless style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehouseDateChange" />
       </view>
     </view>
   </view>
@@ -140,3 +153,41 @@
   <t-empty description="未获取到流转卡数据，请重新扫码" />
   <t-button theme="primary" bind:tap="goScan">去扫码</t-button>
 </view>
+
+<!-- 搜索选择弹层 -->
+<view class="search-mask" wx:if="{{showSearchSelect}}" bindtap="closeSearchSelect"></view>
+<view class="search-panel" wx:if="{{showSearchSelect}}">
+  <view class="search-panel__header">
+    <text class="search-panel__title">选择 {{searchSelectLabel}}</text>
+    <view class="search-panel__close" catchtap="closeSearchSelect">
+      <t-icon name="close" size="40rpx" />
+    </view>
+  </view>
+  <view class="search-panel__search">
+    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
+    <input class="search-panel__input" value="{{searchKeyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onSearchKeywordChange" />
+    <text class="search-panel__clear" wx:if="{{searchKeyword}}" catchtap="clearSearchKeyword">清除</text>
+  </view>
+  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="search-panel__item {{searchSelectValue === item ? 'search-panel__item--selected' : ''}}"
+          wx:for="{{filteredOptions}}" wx:key="*this"
+          data-value="{{item}}" bindtap="selectSearchOption">
+      <text>{{item}}</text>
+      <t-icon wx:if="{{searchSelectValue === item}}" name="check" size="32rpx" style="color:#0052D9;" />
+    </view>
+    <view class="search-panel__empty" wx:if="{{filteredOptions.length === 0}}">
+      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
+      <text wx:if="{{searchSelectOptions.length === 0}}">该字段无配置选项</text>
+      <text wx:else>未找到匹配 "{{searchKeyword}}"</text>
+    </view>
+  </scroll-view>
+</view>
+
+<t-date-time-picker
+  visible="{{datePickerVisible}}"
+  value="{{datePickerValue}}"
+  format="YYYY-MM-DD HH:mm:ss"
+  title="选择日期时间"
+  bind:change="onDatePickerConfirm"
+  bind:cancel="onDatePickerCancel"
+/>

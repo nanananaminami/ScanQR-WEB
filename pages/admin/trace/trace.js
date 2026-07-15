@@ -32,6 +32,11 @@ Page({
   loadTrace() {
     this.setData({ loading: true });
     const queryId = this.data.cardNo;
+    if (!queryId) {
+      this.setData({ loading: false });
+      wx.showToast({ title: '缺少卡号信息', icon: 'none' });
+      return;
+    }
     auth.callWithAuth('getCardTrace', {
       order_no: queryId
     }).then((res) => {
@@ -41,9 +46,11 @@ Page({
         const card = result.card || {};
         const stepCount = Array.isArray(card.steps) ? card.steps.length : 0;
         const headerData = card.header_data || {};
-        const headerEntries = Object.entries(headerData).map(([key, value]) => ({
-          key, value: String(value || '')
-        }));
+        const headerEntries = Object.entries(headerData)
+          .filter(([key]) => !key.startsWith('__'))
+          .map(([key, value]) => ({
+            key, value: String(value || '')
+          }));
         const projectName = headerData.project_name || card.project_name || card.prod_name || card.order_no || '';
         this.setData({ card, logs, loading: false, stepCount, projectName, headerEntries });
       } else {

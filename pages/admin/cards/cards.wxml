@@ -16,7 +16,7 @@
 
   <block wx:if="{{!loading}}">
     <view class="card-list" wx:if="{{cards.length > 0}}">
-      <view class="card-item" wx:for="{{cards}}" wx:key="_id">
+      <view class="card-item" wx:for="{{cards}}" wx:key="_id" data-order-no="{{item.orderNo}}" bindtap="openDetail">
         <view class="card-item__header">
           <view class="card-item__no">{{item.orderNo}}</view>
           <view class="card-item__tags">
@@ -25,6 +25,10 @@
           </view>
         </view>
         <view class="card-item__name">{{item.projectLabel}}</view>
+        <view class="card-item__row">
+          <text class="card-item__label">工单号</text>
+          <text class="card-item__value">{{item.workOrderNo || '-'}}</text>
+        </view>
         <view class="card-item__row">
           <text class="card-item__label">工序数</text>
           <text class="card-item__value">{{item.stepCount}} 道</text>
@@ -37,7 +41,10 @@
           <text class="card-item__label">锁定时间</text>
           <text class="card-item__value">{{item.lockTimeText}}</text>
         </view>
-        <view class="card-item__action">
+        <view class="card-item__action" catchtap="noop">
+          <t-button theme="default" size="small" variant="text" data-order-no="{{item.orderNo}}" bind:tap="viewQrCode">
+            二维码
+          </t-button>
           <t-button theme="default" size="small" variant="text" data-order-no="{{item.orderNo}}" bind:tap="goTrace">
             追溯
           </t-button>
@@ -68,29 +75,40 @@
       </view>
     </view>
 
-    <!-- 系统工单号：仅在模板未自带 order_no 字段时才显示 -->
-    <view class="form-row" wx:if="{{!hasOrderNoField}}">
-      <text class="form-label">工单号 *</text>
-      <t-input value="{{createForm.order_no}}" placeholder="如 A260130011" data-field="order_no" bind:change="onCreateFormChange" />
+    <!-- 流程卡号（固定字段，提交时自动生成） -->
+    <view class="form-row">
+      <text class="form-label">流程卡号</text>
+      <view class="form-picker form-picker--readonly">
+        <text class="form-picker__text form-picker__placeholder">提交时自动生成（工单号 + 两位顺序码）</text>
+        <t-icon name="time" size="32rpx" style="color:#909399;" />
+      </view>
     </view>
 
-    <!-- 动态表头字段 -->
+    <!-- 工单号（固定字段，用户输入） -->
+    <view class="form-row">
+      <text class="form-label">工单号 *</text>
+      <t-input value="{{createForm.workOrderNo}}" placeholder="如 A260130011" data-field="workOrderNo" bind:change="onCreateFormChange" />
+    </view>
+
+    <!-- 动态表头字段（过滤掉系统固定字段 order_no / work_order_no） -->
     <block wx:if="{{selectedTemplate}}">
-      <view class="form-row" wx:for="{{selectedTemplate.header_fields}}" wx:key="field_name">
+      <view class="form-row" wx:for="{{selectedTemplate.header_fields}}" wx:key="field_name" wx:if="{{item.field_name !== 'order_no' && item.field_name !== 'work_order_no'}}">
         <text class="form-label">{{item.label}}{{item.required ? ' *' : ''}}</text>
         <t-input wx:if="{{item.type === 'input' || item.type === 'text'}}" value="{{headerForm[item.field_name]}}" data-field="{{item.field_name}}" placeholder="请输入" bind:change="onHeaderFormChange" />
         <t-input wx:elif="{{item.type === 'number'}}" value="{{headerForm[item.field_name]}}" type="number" data-field="{{item.field_name}}" placeholder="0" bind:change="onHeaderFormChange" />
         <t-textarea wx:elif="{{item.type === 'textarea'}}" value="{{headerForm[item.field_name]}}" data-field="{{item.field_name}}" placeholder="请输入" autosize="{{true}}" bind:change="onHeaderFormChange" />
-        <view wx:elif="{{item.type === 'select'}}" class="form-picker" data-field="{{item.field_name}}" bindtap="pickHeaderSelect">
+        <view wx:elif="{{item.type === 'select'}}" class="form-picker" data-field="{{item.field_name}}" bindtap="openSearchSelect">
           <text class="{{headerForm[item.field_name] ? '' : 'form-picker__placeholder'}}">{{headerForm[item.field_name] || '请选择'}}</text>
-          <t-icon name="chevron-right" size="32rpx" />
+          <t-icon name="chevron-right" size="32rpx" data-field="{{item.field_name}}" catchtap="openSearchSelect" />
         </view>
-        <view wx:elif="{{item.type === 'datetime'}}" class="form-picker" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
+        <view wx:elif="{{item.type === 'datetime' && item.auto_now !== false}}" class="form-picker" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
           <text class="{{headerForm[item.field_name] ? '' : 'form-picker__placeholder'}}">{{headerForm[item.field_name] || '点击记录时间'}}</text>
           <t-icon name="time" size="32rpx" />
         </view>
-        <!-- 当模板的 order_no 字段时，提示该值将作为卡号 -->
-        <view wx:if="{{item.field_name === 'order_no'}}" class="form-order-note">↓ 该值将作为流转卡号（扫码识别用）</view>
+        <view wx:elif="{{item.type === 'datetime' && item.auto_now === false}}" class="form-picker" data-field="{{item.field_name}}" bindtap="openDatePicker">
+          <text class="{{headerForm[item.field_name] ? '' : 'form-picker__placeholder'}}">{{headerForm[item.field_name] || '选择日期时间'}}</text>
+          <t-icon name="calendar" size="32rpx" />
+        </view>
       </view>
     </block>
 
@@ -146,3 +164,41 @@
     <t-button theme="primary" bind:tap="submitCreate" loading="{{creating}}">创建</t-button>
   </view>
 </view>
+
+<!-- 搜索选择弹层（可模糊查询） -->
+<view class="search-mask" wx:if="{{showSearchSelect}}" bindtap="closeSearchSelect"></view>
+<view class="search-panel" wx:if="{{showSearchSelect}}">
+  <view class="search-panel__header">
+    <text class="search-panel__title">选择 {{searchSelectLabel}}</text>
+    <view class="search-panel__close" catchtap="closeSearchSelect">
+      <t-icon name="close" size="40rpx" />
+    </view>
+  </view>
+  <view class="search-panel__search">
+    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
+    <input class="search-panel__input" value="{{searchKeyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onSearchKeywordChange" />
+    <text class="search-panel__clear" wx:if="{{searchKeyword}}" catchtap="clearSearchKeyword">清除</text>
+  </view>
+  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="search-panel__item {{searchSelectValue === item ? 'search-panel__item--selected' : ''}}"
+          wx:for="{{filteredOptions}}" wx:key="*this"
+          data-value="{{item}}" bindtap="selectSearchOption">
+      <text>{{item}}</text>
+      <t-icon wx:if="{{searchSelectValue === item}}" name="check" size="32rpx" style="color:#0052D9;" />
+    </view>
+    <view class="search-panel__empty" wx:if="{{filteredOptions.length === 0}}">
+      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
+      <text wx:if="{{searchSelectOptions.length === 0}}">该字段无配置选项（请先在字典管理添加）</text>
+      <text wx:else>未找到匹配 "{{searchKeyword}}"</text>
+    </view>
+  </scroll-view>
+</view>
+
+<t-date-time-picker
+  visible="{{datePickerVisible}}"
+  value="{{datePickerValue}}"
+  format="YYYY-MM-DD HH:mm:ss"
+  title="选择日期时间"
+  bind:change="onDatePickerConfirm"
+  bind:cancel="onDatePickerCancel"
+/>

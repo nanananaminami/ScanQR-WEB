@@ -10,7 +10,17 @@ Page({
     fields: [],
     formData: {},
     stepName: '',
-    operatorName: ''
+    operatorName: '',
+    datePickerVisible: false,
+    datePickerValue: '',
+    datePickerField: '',
+    showSearchSelect: false,
+    searchSelectField: '',
+    searchSelectLabel: '',
+    searchSelectOptions: [],
+    searchSelectValue: '',
+    searchKeyword: '',
+    filteredOptions: []
   },
 
   onLoad(options) {
@@ -81,20 +91,67 @@ Page({
     this.setData({ ['formData.' + field]: value });
   },
 
-  // 下拉选择：弹出 action sheet 供用户选择
-  pickSelect(e) {
+  openSearchSelect(e) {
     const field = e.currentTarget.dataset.field;
     const options = e.currentTarget.dataset.options || [];
-    if (options.length === 0) {
-      wx.showToast({ title: '该字段无选项', icon: 'none' });
-      return;
-    }
-    wx.showActionSheet({
-      itemList: options,
-      success: (res) => {
-        this.setData({ ['formData.' + field]: options[res.tapIndex] });
-      }
+    const currentValue = this.data.formData[field] || '';
+    this.setData({
+      showSearchSelect: true,
+      searchSelectField: field,
+      searchSelectLabel: field,
+      searchSelectOptions: options,
+      searchSelectValue: currentValue,
+      searchKeyword: '',
+      filteredOptions: options
     });
+  },
+
+  closeSearchSelect() {
+    this.setData({ showSearchSelect: false });
+  },
+
+  onSearchKeywordChange(e) {
+    const keyword = (e.detail.value || '').toLowerCase().trim();
+    const opts = this.data.searchSelectOptions;
+    const filtered = keyword
+      ? opts.filter(o => String(o).toLowerCase().indexOf(keyword) !== -1)
+      : opts;
+    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
+  },
+
+  clearSearchKeyword() {
+    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
+  },
+
+  selectSearchOption(e) {
+    const value = e.currentTarget.dataset.value;
+    const field = this.data.searchSelectField;
+    this.setData({
+      ['formData.' + field]: value,
+      showSearchSelect: false
+    });
+  },
+
+  openDatePicker(e) {
+    const field = e.currentTarget.dataset.field;
+    this.setData({
+      datePickerVisible: true,
+      datePickerValue: this.data.formData[field] || '',
+      datePickerField: field
+    });
+  },
+
+  onDatePickerConfirm(e) {
+    const field = this.data.datePickerField;
+    this.setData({
+      ['formData.' + field]: e.detail.value,
+      datePickerVisible: false,
+      datePickerField: ''
+    });
+  },
+
+  onDatePickerCancel() {
+    this.setData({ datePickerVisible: false, datePickerField: '' });
   },
 
   // 为 datetime 字段生成当前时间字符串
@@ -104,7 +161,7 @@ Page({
     const now = new Date();
     const timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
     fields.forEach((f) => {
-      if (f.type === 'datetime') {
+      if (f.type === 'datetime' && f.auto_now !== false) {
         result[f.field_name] = timeStr;
       }
     });
@@ -115,9 +172,9 @@ Page({
     const { fields, formData, cardData, operatorName, submitting } = this.data;
     if (submitting) return;
 
-    // 必填校验（datetime 跳过，提交时自动填充）
+    // 必填校验（datetime.auto_now=true 跳过，提交时自动填充）
     for (const f of fields) {
-      if (f.required && f.type !== 'datetime') {
+      if (f.required && (f.type !== 'datetime' || f.auto_now === false)) {
         const val = formData[f.field_name];
         if (val === undefined || val === null || val === '') {
           wx.showToast({ title: '请填写' + f.label, icon: 'none' });

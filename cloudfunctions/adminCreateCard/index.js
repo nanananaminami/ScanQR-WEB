@@ -33,6 +33,10 @@ async function authenticate(event) {
   return { ok: true, user, role, role_id: user.role_id, permissions, session };
 }
 
+function escapeRegex(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // 构建单道工序的 dynamic_step 结构（嵌套 depts：生产 + 品质）
 function buildDynamicStep(stepName, sort, detailFields) {
   const deptFields = {};
@@ -54,6 +58,8 @@ function buildDynamicStep(stepName, sort, detailFields) {
 function buildHeaderData(headerFields, submittedHeader) {
   const data = {};
   headerFields.forEach(f => {
+    // 跳过系统固定字段（order_no / work_order_no 由系统自动管理）
+    if (f.field_name === 'order_no' || f.field_name === 'work_order_no') return;
     const val = submittedHeader[f.field_name];
     data[f.field_name] = (val !== undefined && val !== null) ? val : (f.type === 'number' ? 0 : '');
   });
@@ -61,7 +67,7 @@ function buildHeaderData(headerFields, submittedHeader) {
 }
 
 exports.main = async (event, context) => {
-  const { order_no, template_id, header_data, steps } = event;
+  const { work_order_no, template_id, header_data, steps } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -69,7 +75,7 @@ exports.main = async (event, context) => {
       return { success: false, code: 'FORBIDDEN', msg: '无权限：缺少 card_list 权限' };
     }
 
-    if (!order_no || !template_id) {
+    if (!work_order_no || !template_id) {
       return { success: false, code: 'INVALID_PARAMS', msg: '工单号、模板为必填' };
     }
 
@@ -77,9 +83,23 @@ exports.main = async (event, context) => {
       return { success: false, code: 'INVALID_PARAMS', msg: '工序列表不能为空' };
     }
 
-    const exist = await db.collection('process_cards').where({ order_no }).get();
-    if (exist.data.length > 0) {
-      return { success: false, code: 'DUP_ORDER_NO', msg: '工单号已存在：' + order_no };
+    // 自动生成流程卡号 = 工单号 + 两位顺序码（如 A260130011 + 01 = A26013001101）
+    const prefix = work_order_no.trim();
+    const existingRes = await db.collection('process_cards').where({
+      order_no: db.RegExp({ regexp: '^' + escapeRegex(prefix), options: 'i' })
+    }).get();
+    let maxSeq = 0;
+    existingRes.data.forEach(c => {
+      const seqStr = (c.order_no || '').replace(prefix, '');
+      const seqNum = parseInt(seqStr, 10);
+      if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+    });
+    const order_no = prefix + String(maxSeq + 1).padStart(2, '0');
+
+    // 流程卡号唯一性校验（正常不会冲突，作为安全兜底）
+    const dupCheck = await db.collection('process_cards').where({ order_no }).get();
+    if (dupCheck.data.length > 0) {
+      return { success: false, code: 'DUP_ORDER_NO', msg: '流程卡号已存在：' + order_no };
     }
 
     const tplRes = await db.collection('process_templates').where({ template_id }).get();
@@ -97,6 +117,7 @@ exports.main = async (event, context) => {
     const addRes = await db.collection('process_cards').add({
       data: {
         order_no,
+        work_order_no: prefix,
         template_id,
         header_data: builtHeaderData,
         dynamic_steps: dynamicSteps,
@@ -117,7 +138,8 @@ exports.main = async (event, context) => {
       success: true,
       msg: '流转卡已创建',
       card_id: addRes._id,
-      order_no
+      order_no,
+      work_order_no: prefix
     };
   } catch (err) {
     return { success: false, msg: '创建失败', error: err };

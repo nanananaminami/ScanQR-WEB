@@ -1,0 +1,85 @@
+<t-navbar title="流转卡详情" leftArrow />
+
+<view class="cd-loading" wx:if="{{loading}}">
+  <t-loading theme="circular" size="40rpx" text="加载中..." />
+</view>
+
+<view class="cd-page" wx:if="{{!loading && card}}">
+
+  <!-- 基本信息 -->
+  <view class="cd-card">
+    <view class="cd-card__title">基本信息</view>
+    <view class="cd-row">
+      <text class="cd-row__label">流程卡号</text>
+      <text class="cd-row__value">{{orderNo}}</text>
+    </view>
+    <view class="cd-row">
+      <text class="cd-row__label">工单号</text>
+      <text class="cd-row__value">{{card.work_order_no || '-'}}</text>
+    </view>
+    <view class="cd-row" wx:for="{{headerFields}}" wx:key="field_name">
+      <text class="cd-row__label">{{item.label}}</text>
+      <text class="cd-row__value">{{headerData[item.field_name] || '-'}}</text>
+    </view>
+    <view class="cd-row">
+      <text class="cd-row__label">状态</text>
+      <t-tag theme="{{card.status === '已完工' ? 'success' : (card.status === '已作废' ? 'danger' : 'primary')}}" variant="light" size="small">{{card.status}}</t-tag>
+    </view>
+  </view>
+
+  <!-- 工序明细（只读） -->
+  <view class="cd-card" wx:if="{{dynamicSteps.length > 0}}">
+    <view class="cd-card__title">工序明细（{{dynamicSteps.length}} 道）</view>
+
+    <view class="cd-step" wx:for="{{dynamicSteps}}" wx:key="sort" wx:for-index="mainIndex">
+      <view class="cd-step__title">工序 {{mainIndex + 1}}：{{item.step_name}}</view>
+
+      <view class="cd-step__devices">
+        <view class="cd-step__device">
+          <text class="cd-step__device-label">设备号</text>
+          <text class="cd-step__device-value">{{item.device_no || '-'}}</text>
+        </view>
+        <view class="cd-step__device">
+          <text class="cd-step__device-label">夹具号</text>
+          <text class="cd-step__device-value">{{item.fixture_no || '-'}}</text>
+        </view>
+      </view>
+
+      <view class="cd-dept" wx:for="{{item.depts}}" wx:for-item="dept" wx:for-index="subIndex" wx:key="dept_name">
+        <view class="cd-dept__tag">
+          <t-tag theme="{{dept.dept_name === '生产' ? 'primary' : 'warning'}}" variant="light" size="small">{{dept.dept_name}}</t-tag>
+        </view>
+        <view class="cd-dept__fields">
+          <view class="cd-dept__field" wx:for="{{detailFields}}" wx:for-item="df" wx:key="field_name">
+            <text class="cd-dept__field-label">{{df.label}}</text>
+            <text class="cd-dept__field-value">{{dept[df.field_name] || '-'}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 入库签字 -->
+  <view class="cd-card">
+    <view class="cd-card__title">入库签字</view>
+    <view class="cd-row">
+      <text class="cd-row__label">入库人员</text>
+      <text class="cd-row__value">{{warehousePersonnel || '-'}}</text>
+    </view>
+    <view class="cd-row">
+      <text class="cd-row__label">入库日期</text>
+      <text class="cd-row__value">{{warehouseDate || '-'}}</text>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="cd-actions">
+    <t-button theme="primary" block bind:tap="viewQrCode">查看二维码</t-button>
+    <t-button wx:if="{{card.status === '加工中'}}" theme="default" block bind:tap="editCard">编辑填报</t-button>
+    <t-button theme="default" block bind:tap="goTrace">生命周期追溯</t-button>
+  </view>
+</view>
+
+<view class="cd-empty" wx:if="{{!loading && !card}}">
+  <t-empty description="未找到流转卡" />
+</view>

@@ -60,12 +60,15 @@ exports.main = async (event, context) => {
 
     let logsRes;
     if (card) {
+      const logConditions = [{ order_no: card.order_no }];
+      if (card.card_no) {
+        logConditions.push({ card_no: card.card_no });
+      }
+      if (card.card_no && card.card_no !== card.order_no) {
+        logConditions.push({ order_no: card.card_no });
+      }
       logsRes = await db.collection('process_logs')
-        .where(db.command.or([
-          { order_no: card.order_no },
-          { card_no: card.order_no },
-          { card_no: card.card_no }
-        ]))
+        .where(logConditions.length === 1 ? logConditions[0] : _.or(logConditions))
         .orderBy('submit_time', 'asc')
         .limit(100)
         .get();

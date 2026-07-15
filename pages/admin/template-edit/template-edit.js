@@ -29,7 +29,14 @@ Page({
     detailFields: [],
     dicts: [],
     fieldTypes: FIELD_TYPES,
-    typeNameMap: TYPE_NAME_MAP
+    typeNameMap: TYPE_NAME_MAP,
+    showSearchSelect: false,
+    searchSelectFieldIndex: -1,
+    searchSelectLabel: '',
+    searchSelectOptions: [],
+    searchSelectValue: '',
+    searchKeyword: '',
+    filteredOptions: []
   },
 
   onLoad(options) {
@@ -87,6 +94,7 @@ Page({
       label: f.label || '',
       type: f.type || 'input',
       required: !!f.required,
+      auto_now: f.auto_now !== undefined ? f.auto_now : true,
       width: f.width || 150,
       placeholder: f.placeholder || '',
       default: f.default || '',
@@ -149,6 +157,12 @@ Page({
     this.setData({ [key + '[' + index + '].required']: e.detail.value });
   },
 
+  onFieldAutoNowChange(e) {
+    const index = e.currentTarget.dataset.index;
+    const key = this.getFieldsKey();
+    this.setData({ [key + '[' + index + '].auto_now']: e.detail.value });
+  },
+
   onUseDictChange(e) {
     const index = e.currentTarget.dataset.index;
     const key = this.getFieldsKey();
@@ -158,20 +172,49 @@ Page({
     }
   },
 
-  pickDict(e) {
+  openDictSearchSelect(e) {
     const index = e.currentTarget.dataset.index;
     const dicts = this.data.dicts;
     if (dicts.length === 0) {
       wx.showToast({ title: '请先在字典管理中创建', icon: 'none' });
       return;
     }
-    wx.showActionSheet({
-      itemList: dicts.map(d => d.dict_name + '（' + d.dict_id + '）'),
-      success: (res) => {
-        const dict = dicts[res.tapIndex];
-        const key = this.getFieldsKey();
-        this.setData({ [key + '[' + index + '].dict_id']: dict.dict_id });
-      }
+    const currentValue = this.data[this.getFieldsKey()][index].dict_id || '';
+    this.setData({
+      showSearchSelect: true,
+      searchSelectFieldIndex: index,
+      searchSelectLabel: '字典',
+      searchSelectOptions: dicts,
+      searchSelectValue: currentValue,
+      searchKeyword: '',
+      filteredOptions: dicts
+    });
+  },
+
+  closeSearchSelect() {
+    this.setData({ showSearchSelect: false });
+  },
+
+  onSearchKeywordChange(e) {
+    const keyword = (e.detail.value || '').toLowerCase().trim();
+    const opts = this.data.searchSelectOptions;
+    const filtered = keyword
+      ? opts.filter(d => d.dict_name.toLowerCase().indexOf(keyword) !== -1 || d.dict_id.toLowerCase().indexOf(keyword) !== -1)
+      : opts;
+    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
+  },
+
+  clearSearchKeyword() {
+    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
+  },
+
+  selectSearchOption(e) {
+    const dictId = e.currentTarget.dataset.value;
+    const index = this.data.searchSelectFieldIndex;
+    const key = this.getFieldsKey();
+    this.setData({
+      [key + '[' + index + '].dict_id']: dictId,
+      showSearchSelect: false
     });
   },
 
@@ -249,7 +292,7 @@ Page({
         clean.width = f.width || 150;
       }
       if (f.type === 'datetime') {
-        clean.auto_now = true;
+        clean.auto_now = f.auto_now !== undefined ? f.auto_now : true;
       }
       if (f.type === 'select') {
         if (f.use_dict && f.dict_id) {

@@ -1,0 +1,141 @@
+.cd-loading {
+  display: flex;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+
+.cd-page {
+  padding: 24rpx 24rpx 120rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.cd-card {
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.cd-card__title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--td-text-color-primary, #303133);
+  margin-bottom: 16rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid var(--td-component-border, #f0f0f0);
+}
+
+.cd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10rpx 0;
+  font-size: 28rpx;
+}
+
+.cd-row__label {
+  color: var(--td-text-color-secondary, #909399);
+  flex-shrink: 0;
+}
+
+.cd-row__value {
+  color: var(--td-text-color-primary, #303133);
+  font-weight: 500;
+  text-align: right;
+  flex: 1;
+  margin-left: 24rpx;
+  word-break: break-all;
+}
+
+/* 工序明细 */
+.cd-step {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--td-component-border, #f0f0f0);
+}
+
+.cd-step:last-child {
+  border-bottom: none;
+}
+
+.cd-step__title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--td-brand-color-7, #0052d9);
+  margin-bottom: 12rpx;
+}
+
+.cd-step__devices {
+  display: flex;
+  gap: 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.cd-step__device {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.cd-step__device-label {
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #909399);
+  white-space: nowrap;
+}
+
+.cd-step__device-value {
+  font-size: 26rpx;
+  color: var(--td-text-color-primary, #303133);
+  font-weight: 500;
+}
+
+.cd-dept {
+  background: var(--td-bg-color-secondarycontainer, #f9f9f9);
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 12rpx;
+}
+
+.cd-dept__tag {
+  margin-bottom: 10rpx;
+}
+
+.cd-dept__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx 24rpx;
+}
+
+.cd-dept__field {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  width: calc(50% - 12rpx);
+}
+
+.cd-dept__field-label {
+  font-size: 22rpx;
+  color: var(--td-text-color-secondary, #909399);
+  white-space: nowrap;
+}
+
+.cd-dept__field-value {
+  font-size: 24rpx;
+  color: var(--td-text-color-primary, #303133);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* 操作按钮 */
+.cd-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 16rpx;
+}
+
+.cd-empty {
+  padding-top: 200rpx;
+}

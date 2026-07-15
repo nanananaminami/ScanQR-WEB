@@ -72,9 +72,15 @@
       <t-input value="{{item.field_name}}" placeholder="如 project_name" data-index="{{index}}" data-field="field_name" bind:change="onFieldChange" />
     </view>
 
-    <view class="te-row te-row--inline" wx:if="{{item.type !== 'datetime'}}">
+    <view class="te-row te-row--inline">
       <text class="te-label">必填</text>
       <t-switch value="{{item.required}}" data-index="{{index}}" bind:change="onFieldRequiredChange" />
+    </view>
+
+    <!-- datetime: 自动记录 vs 手动选择 -->
+    <view class="te-row te-row--inline" wx:if="{{item.type === 'datetime'}}">
+      <text class="te-label">自动记录</text>
+      <t-switch value="{{item.auto_now !== false}}" data-index="{{index}}" bind:change="onFieldAutoNowChange" />
     </view>
 
     <!-- 明细额外：列宽 -->
@@ -83,8 +89,8 @@
       <t-input value="{{item.width}}" type="number" placeholder="如 180" data-index="{{index}}" data-field="width" bind:change="onFieldChange" />
     </view>
 
-    <!-- 占位提示（非datetime） -->
-    <view class="te-row" wx:if="{{item.type !== 'datetime'}}">
+    <!-- 占位提示（非自动记录datetime） -->
+    <view class="te-row" wx:if="{{item.type !== 'datetime' || item.auto_now === false}}">
       <text class="te-label">占位提示</text>
       <t-input value="{{item.placeholder}}" placeholder="请输入" data-index="{{index}}" data-field="placeholder" bind:change="onFieldChange" />
     </view>
@@ -103,20 +109,51 @@
       </view>
       <view class="te-row" wx:if="{{item.use_dict}}">
         <text class="te-label">选择字典</text>
-        <view class="te-picker" data-index="{{index}}" bindtap="pickDict">
+        <view class="te-picker" data-index="{{index}}" bindtap="openDictSearchSelect">
           <text>{{item.dict_id || '请选择'}}</text>
           <t-icon name="chevron-right" size="32rpx" />
         </view>
       </view>
       <view class="te-row" wx:if="{{!item.use_dict}}">
         <text class="te-label">选项（每行一个）</text>
-        <t-textarea value="{{item.options}}" placeholder="选项1&#10;选项2" data-index="{{index}}" data-field="options" bind:change="onFieldChange" autosize />
+        <t-textarea value="{{item.options}}" placeholder="选项1&#10;选项2" data-index="{{index}}" data-field="options" bind:change="onFieldChange" autosize="{{true}}" />
       </view>
     </block>
 
-    <!-- 时间戳说明 -->
-    <view class="te-tip" wx:if="{{item.type === 'datetime'}}">
-      提交时自动记录当前时间，工人无需手动填写
+    <!-- 时间日期说明 -->
+    <view class="te-tip" wx:if="{{item.type === 'datetime' && item.auto_now !== false}}">
+      自动记录当前时间，工人无需手动填写
+    </view>
+    <view class="te-tip" wx:if="{{item.type === 'datetime' && item.auto_now === false}}">
+      工人使用日期时间选择器手动选择
     </view>
   </view>
 </template>
+
+<!-- 搜索选择弹层 -->
+<view class="search-mask" wx:if="{{showSearchSelect}}" bindtap="closeSearchSelect"></view>
+<view class="search-panel" wx:if="{{showSearchSelect}}">
+  <view class="search-panel__header">
+    <text class="search-panel__title">选择字典</text>
+    <view class="search-panel__close" catchtap="closeSearchSelect">
+      <t-icon name="close" size="40rpx" />
+    </view>
+  </view>
+  <view class="search-panel__search">
+    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
+    <input class="search-panel__input" value="{{searchKeyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onSearchKeywordChange" />
+    <text class="search-panel__clear" wx:if="{{searchKeyword}}" catchtap="clearSearchKeyword">清除</text>
+  </view>
+  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="search-panel__item {{searchSelectValue === item.dict_id ? 'search-panel__item--selected' : ''}}"
+          wx:for="{{filteredOptions}}" wx:key="_id"
+          data-value="{{item.dict_id}}" bindtap="selectSearchOption">
+      <text>{{item.dict_name}}（{{item.dict_id}}）</text>
+      <t-icon wx:if="{{searchSelectValue === item.dict_id}}" name="check" size="32rpx" style="color:#0052D9;" />
+    </view>
+    <view class="search-panel__empty" wx:if="{{filteredOptions.length === 0}}">
+      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
+      <text>未找到匹配 "{{searchKeyword}}"</text>
+    </view>
+  </scroll-view>
+</view>

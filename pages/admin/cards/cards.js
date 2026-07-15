@@ -15,15 +15,26 @@ Page({
     selectedTemplate: null,
     selectedTemplateName: '',
     createForm: {
-      order_no: '',
+      workOrderNo: '',
       stepsText: ''
     },
     processList: [],
     selectedProcesses: [],
     showCustomInput: false,
     customProcessText: '',
+    dicts: [],
     headerForm: {},
-    hasOrderNoField: false,
+    // 搜索选择弹层
+    showSearchSelect: false,
+    searchSelectField: '',
+    searchSelectLabel: '',
+    searchSelectOptions: [],
+    searchSelectValue: '',
+    searchKeyword: '',
+    filteredOptions: [],
+    datePickerVisible: false,
+    datePickerValue: '',
+    datePickerField: '',
     creating: false
   },
 
@@ -61,6 +72,7 @@ Page({
           ...c,
           orderNo: c.order_no || c.card_no || '',
           projectLabel: this.getProjectLabel(c),
+          workOrderNo: c.work_order_no || '',
           stepCount: (c.dynamic_steps || c.steps || []).length || 0,
           lockedText: c.is_locked ? '锁定中' : '空闲',
           lockTimeText: c.lock_time ? this.formatTime(c.lock_time) : '-',
@@ -127,16 +139,16 @@ Page({
       const processList = processDict ? (processDict.options || []) : [];
       this.setData({
         templates: result.templates,
+        dicts: dicts,
         showCreate: true,
         selectedTemplate: null,
         selectedTemplateName: '',
-        createForm: { order_no: '', stepsText: '' },
+        createForm: { workOrderNo: '', stepsText: '' },
         processList: processList,
         selectedProcesses: [],
         showCustomInput: false,
         customProcessText: '',
-        headerForm: {},
-        hasOrderNoField: false
+        headerForm: {}
       });
     }).catch(() => {
       wx.hideLoading();
@@ -165,32 +177,17 @@ Page({
   },
 
   resolveTemplateSelects(tpl) {
-    const selectFields = (tpl.header_fields || []).concat(tpl.detail_fields || []).filter(f => f.type === 'select' && f.dict_id && (!f.options || f.options.length === 0));
-    const hasOrderNoField = (tpl.header_fields || []).some(f => f.field_name === 'order_no');
-    if (selectFields.length === 0) {
-      const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
-      this.setData({ selectedTemplate: tpl, selectedTemplateName: tpl.template_name, headerForm, hasOrderNoField });
-      return;
-    }
-    auth.callWithAuth('getDictList').then((res) => {
-      const result = res.result || {};
-      const dicts = result.dicts || [];
-      const dictMap = {};
-      dicts.forEach(d => { dictMap[d.dict_id] = d.options || []; });
-      selectFields.forEach(f => {
-        if (dictMap[f.dict_id]) f.options = dictMap[f.dict_id];
-      });
-      const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
-      this.setData({
-        selectedTemplate: tpl,
-        selectedTemplateName: tpl.template_name,
-        headerForm,
-        hasOrderNoField
-      });
-    }).catch(() => {
-      const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
-      this.setData({ selectedTemplate: tpl, selectedTemplateName: tpl.template_name, headerForm, hasOrderNoField });
+    // 使用 openCreate 时已缓存的字典同步解析 select 选项，避免异步时序问题
+    const dicts = this.data.dicts || [];
+    const dictMap = {};
+    dicts.forEach(d => { dictMap[d.dict_id] = d.options || []; });
+    (tpl.header_fields || []).concat(tpl.detail_fields || []).forEach(f => {
+      if (f.type === 'select' && f.dict_id && dictMap[f.dict_id] && (!f.options || f.options.length === 0)) {
+        f.options = dictMap[f.dict_id];
+      }
     });
+    const headerForm = this.buildHeaderForm(tpl.header_fields || [], {});
+    this.setData({ selectedTemplate: tpl, selectedTemplateName: tpl.template_name, headerForm });
   },
 
   onCreateFormChange(e) {
@@ -253,17 +250,53 @@ Page({
   },
 
   pickHeaderSelect(e) {
+    // 兼容旧调用：跳转搜索弹层
+    this.openSearchSelect(e);
+  },
+
+  // 打开搜索选择弹层（支持模糊查询）
+  openSearchSelect(e) {
     const field = e.currentTarget.dataset.field;
     const options = this.data.headerForm['__dictOpt_' + field] || [];
-    if (options.length === 0) {
-      wx.showToast({ title: '无选项', icon: 'none' });
-      return;
-    }
-    wx.showActionSheet({
-      itemList: options,
-      success: (res) => {
-        this.setData({ ['headerForm.' + field]: options[res.tapIndex] });
-      }
+    const tpl = this.data.selectedTemplate;
+    const f = (tpl && tpl.header_fields || []).find(x => x.field_name === field);
+    const label = (f && f.label) || field;
+    const currentValue = this.data.headerForm[field] || '';
+    this.setData({
+      showSearchSelect: true,
+      searchSelectField: field,
+      searchSelectLabel: label,
+      searchSelectOptions: options,
+      searchSelectValue: currentValue,
+      searchKeyword: '',
+      filteredOptions: options
+    });
+  },
+
+  closeSearchSelect() {
+    this.setData({ showSearchSelect: false });
+  },
+
+  // 模糊过滤：忽略大小写、子串匹配
+  onSearchKeywordChange(e) {
+    const keyword = (e.detail.value || '').toLowerCase().trim();
+    const options = this.data.searchSelectOptions;
+    const filtered = keyword
+      ? options.filter(o => String(o).toLowerCase().indexOf(keyword) !== -1)
+      : options;
+    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
+  },
+
+  clearSearchKeyword() {
+    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
+  },
+
+  selectSearchOption(e) {
+    const value = e.currentTarget.dataset.value;
+    const field = this.data.searchSelectField;
+    this.setData({
+      ['headerForm.' + field]: value,
+      showSearchSelect: false
     });
   },
 
@@ -276,18 +309,38 @@ Page({
     wx.showToast({ title: '已记录时间', icon: 'success', duration: 1000 });
   },
 
+  openDatePicker(e) {
+    const field = e.currentTarget.dataset.field;
+    this.setData({
+      datePickerVisible: true,
+      datePickerValue: this.data.headerForm[field] || '',
+      datePickerField: field
+    });
+  },
+
+  onDatePickerConfirm(e) {
+    const field = this.data.datePickerField;
+    this.setData({
+      ['headerForm.' + field]: e.detail.value,
+      datePickerVisible: false,
+      datePickerField: ''
+    });
+  },
+
+  onDatePickerCancel() {
+    this.setData({ datePickerVisible: false, datePickerField: '' });
+  },
+
   submitCreate() {
-    const { createForm, selectedTemplate, headerForm, hasOrderNoField, creating } = this.data;
+    const { createForm, selectedTemplate, headerForm, creating } = this.data;
     if (creating) return;
     if (!selectedTemplate) {
       wx.showToast({ title: '请选择模板', icon: 'none' });
       return;
     }
-    // 工单号来源：模板自带 order_no 字段时取其值，否则取系统输入
-    const orderNo = hasOrderNoField
-      ? String(headerForm.order_no || '').trim()
-      : (createForm.order_no || '').trim();
-    if (!orderNo) {
+    // 工单号为固定字段，流程卡号由云端自动生成（工单号 + 两位顺序码）
+    const workOrderNo = (createForm.workOrderNo || '').trim();
+    if (!workOrderNo) {
       wx.showToast({ title: '工单号为必填', icon: 'none' });
       return;
     }
@@ -300,7 +353,7 @@ Page({
     this.setData({ creating: true });
     wx.showLoading({ title: '创建中...' });
     auth.callWithAuth('adminCreateCard', {
-      order_no: orderNo,
+      work_order_no: workOrderNo,
       template_id: selectedTemplate.template_id,
       header_data: headerForm,
       steps: steps
@@ -311,18 +364,16 @@ Page({
       if (result.success) {
         const orderNo = result.order_no;
         this.setData({ showCreate: false, statusFilter: '加工中', selectedProcesses: [], showCustomInput: false, customProcessText: '' });
+        this.loadCards();
+        // 建卡成功后展示流程卡号并自动跳转生成二维码
         wx.showModal({
           title: '建卡成功',
-          content: '流转卡「' + orderNo + '」已创建，是否立即生成二维码？',
-          confirmText: '生成二维码',
-          cancelText: '关闭',
-          success: (r) => {
-            if (r.confirm) {
-              wx.navigateTo({ url: '/pages/qr-gen/qr-gen?order_no=' + encodeURIComponent(orderNo) });
-            }
+          content: '流程卡号：' + orderNo + '\n即将生成二维码',
+          showCancel: false,
+          success: () => {
+            wx.navigateTo({ url: '/pages/qr-gen/qr-gen?order_no=' + encodeURIComponent(orderNo) + '&auto=1' });
           }
         });
-        this.loadCards();
       } else {
         wx.showModal({ title: '创建失败', content: result.msg || '请重试', showCancel: false });
       }
@@ -443,6 +494,21 @@ Page({
     const orderNo = e.currentTarget.dataset.orderNo;
     wx.navigateTo({ url: '/pages/admin/trace/trace?order_no=' + encodeURIComponent(orderNo) });
   },
+
+  // 查看二维码
+  viewQrCode(e) {
+    const orderNo = e.currentTarget.dataset.orderNo;
+    wx.navigateTo({ url: '/pages/qr-gen/qr-gen?order_no=' + encodeURIComponent(orderNo) + '&auto=1' });
+  },
+
+  // 点击卡片进入详情
+  openDetail(e) {
+    const orderNo = e.currentTarget.dataset.orderNo;
+    wx.navigateTo({ url: '/pages/card-detail/card-detail?order_no=' + encodeURIComponent(orderNo) });
+  },
+
+  // 阻止事件冒泡（按钮区域）
+  noop() {},
 
   onPullDownRefresh() {
     this.loadCards();
