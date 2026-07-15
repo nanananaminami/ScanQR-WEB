@@ -48,7 +48,7 @@
     </view>
     <view class="form-row">
       <text class="form-label">选项（每行一个）*</text>
-      <t-textarea value="{{form.options}}" placeholder="开始注塑&#10;保压成型&#10;冷却定型" data-field="options" bind:change="onFormChange" autosize="{{true}}" />
+      <t-textarea value="{{form.options}}" placeholder="开始注塑&#10;保压成型&#10;冷却定型" data-field="options" bind:change="onFormChange" autosize />
     </view>
   </view>
   <view class="dict-panel__actions">

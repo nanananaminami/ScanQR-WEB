@@ -125,11 +125,6 @@ Page({
       const dicts = dictResult.dicts || [];
       const processDict = dicts.find(d => d.dict_id === 'process_list');
       const processList = processDict ? (processDict.options || []) : [];
-
-      if (processList.length === 0) {
-        this.initProcessList();
-      }
-
       this.setData({
         templates: result.templates,
         showCreate: true,
@@ -250,21 +245,6 @@ Page({
 
   goManageProcesses() {
     wx.navigateTo({ url: '/pages/admin/dicts/dicts' });
-  },
-
-  initProcessList() {
-    const defaults = ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割', '冲压', '折弯', '焊接', '喷涂', '组装', '测试', '车削', '铣削', '磨削', '电镀', '包装', '注塑', 'CNC加工', '抛光', '清洗', '烘干', '打标', '目检', '全检', '成品入库'];
-    auth.callWithAuth('adminSaveDict', {
-      dict_id: 'process_list',
-      dict_name: '工序列表',
-      options: defaults,
-      is_new: true
-    }).then((res) => {
-      const result = res.result || {};
-      if (result.success) {
-        this.setData({ processList: defaults });
-      }
-    }).catch(() => {});
   },
 
   onHeaderFormChange(e) {
