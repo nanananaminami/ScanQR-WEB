@@ -1,0 +1,12 @@
+# opencode AI agent
+.opencode/
+opencode.jsonc
+AGENTS.md
+Rfc.md
+docs/agents/
+
+# macOS
+.DS_Store
+
+# CloudBase
+.cloudbase/
