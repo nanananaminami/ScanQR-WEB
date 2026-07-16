@@ -39,8 +39,21 @@
 .scan-actions {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
-  margin-bottom: 40rpx;
+  gap: 20rpx;
+  margin-bottom: 32rpx;
+}
+
+.scan-ws-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 14rpx 24rpx;
+  background: rgba(0, 82, 217, 0.08);
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #0052D9;
+  font-weight: 600;
 }
 
 .scan-meta {

@@ -1,4 +1,108 @@
-# ScanQR-WEB 操作说明书
+# ScanQR-WEB
+
+微信小程序二维码扫码与流程卡管理系统，面向制造车间场景，覆盖建卡 → 扫码锁卡 → 工序填报 → 报工提交 → 全程追溯的完整链路。
+
+## 技术栈
+
+- **前端**: 微信小程序原生框架 (JavaScript)，TDesign Miniprogram 组件库
+- **后端**: 微信云开发 CloudBase，云函数 (Node.js + wx-server-sdk)
+- **渲染**: 支持 Skyline 渲染引擎
+- **主题**: 支持深色模式 (light/dark)
+- **国际化**: `i18n/base.json`
+
+## 项目结构
+
+```
+ScanQR-WEB/
+├── app.js                  # 入口：云开发初始化、会话恢复
+├── app.json                # 路由、tabBar、全局组件、分包配置
+├── app.wxss                # 全局样式
+├── theme.json              # 深色/浅色主题变量
+├── pages/                  # 页面目录
+│   ├── login/              # 登录页
+│   ├── scan/               # 扫码页 (tabBar)
+│   ├── flow-card/          # 流转卡填报（新版多工序）
+│   ├── process-form/       # 流程卡填报（旧版表单）
+│   ├── card-detail/        # 流转卡详情（只读）
+│   ├── qr-gen/             # 二维码生成
+│   ├── home/               # TDesign 组件展示页
+│   └── admin/              # 管理后台
+│       ├── dashboard/      # 数据看板 (tabBar)
+│       ├── cards/          # 在制卡片管理 (tabBar)
+│       ├── logs/           # 操作日志 (tabBar)
+│       ├── profile/        # 个人中心 (tabBar)
+│       ├── trace/          # 卡片追溯
+│       ├── users/          # 用户管理
+│       ├── roles/          # 角色管理
+│       ├── templates/      # 模板管理
+│       ├── template-edit/  # 模板编辑器
+│       └── dicts/          # 数据字典管理
+├── cloudfunctions/         # 云函数 (25个)
+├── components/             # 全局组件
+├── behaviors/              # 共享行为 (skyline.js)
+├── utils/                  # 工具函数
+│   ├── auth.js             # 鉴权：会话管理、权限判断、callWithAuth
+│   ├── qrcode.js           # 二维码生成
+│   └── gulpError.js        # 构建错误处理
+├── custom-tab-bar/         # 自定义权限感知 TabBar
+├── i18n/                   # 国际化
+└── miniprogram_npm/        # npm 构建产物 (tdesign-miniprogram)
+```
+
+## 核心架构
+
+### 鉴权体系
+
+- 所有管理员页面入口调用 `auth.requireLogin()` 检查登录态
+- 权限判断使用 `auth.hasPerm(perm)` 检查具体权限点
+- 云函数调用使用 `auth.callWithAuth(name, data)` 自动注入 `session_token`
+- 会话过期自动清除本地缓存并跳转登录页
+
+### 自定义 TabBar
+
+TabBar 根据用户角色权限动态显示/隐藏标签页，无权限的标签不出现：
+
+| Tab | 权限点 | 说明 |
+|-----|--------|------|
+| 看板 | `dashboard_view` | 数据看板 |
+| 在制 | `card_list` | 卡片管理 |
+| 日志 | `log_view` | 操作日志 |
+| 扫码 | `card_submit` | 扫码报工 |
+| 我的 | 无限制 | 个人中心（始终可见）|
+
+### 模板驱动低代码表单
+
+流转卡表单页面 (`flow-card` / `process-form`) 作为低代码渲染引擎运行：从模板读取字段定义 (`header_fields` + `detail_fields`)，动态渲染 input、number、select、textarea、datetime 等 5 种控件类型，无需硬编码字段。
+
+### 卡片锁定机制
+
+扫码后通过 `getAndLockCard` 锁定流程卡（独占预约，锁定期 30 分钟），提交/放弃后自动解锁，页面关闭时通过 `onUnload` 兜底解锁，防止死锁。
+
+## 云函数
+
+共 25 个云函数，按功能分组：
+
+| 分类 | 云函数 |
+|------|--------|
+| 认证与会话 | `login`, `logout`, `getUserRole` |
+| 卡片操作 | `getAndLockCard`, `submitAndUnlockCard` |
+| 卡片管理 | `adminCreateCard`, `adminUpdateCardStatus`, `adminForceUnlock` |
+| 模板管理 | `getTemplateList`, `adminSaveTemplate`, `adminDeleteTemplate` |
+| 字典管理 | `getDictList`, `adminSaveDict`, `adminDeleteDict` |
+| 用户与角色 | `getUserList`, `getRoleList`, `adminCreateUser`, `adminUpdateUser`, `adminUpdateUserRole`, `adminResetPassword`, `adminSaveRole` |
+| 报表与审计 | `getDashboardStats`, `getCardTrace`, `getLogList` |
+| 系统 | `initSeedData` |
+
+## 开发命令
+
+本项目通过**微信开发者工具**运行和调试：
+
+- **运行**: 用微信开发者工具打开项目根目录
+- **云函数调试**: 右键云函数目录 → 上传并部署/云端调试
+- **npm 构建**: 工具 → 构建 npm（更新 miniprogram_npm）
+- **预览/真机调试**: 工具栏 → 预览 或 真机调试
+
+---
 
 ## 一、系统简介
 
@@ -134,7 +238,7 @@
 
 1. 建卡成功后弹出提示 → 点击 **"生成二维码"**
 2. 或在 **"扫码"** 标签页中点击"生成二维码"入口
-3. 输入工单号 → 点击 **"生成二维码"** → 保存到相册
+3. 输入工单号 → 点击 **"生成二维码"** → 生成 480×480px Canvas 二维码图片，可保存到相册
 
 ---
 
@@ -156,7 +260,21 @@
 
 ---
 
-## 十一、用户管理
+## 十一、模板管理
+
+**"我的"** → **"流程卡模板管理"**：支持创建和编辑模板，定义表头字段和明细字段。
+
+### 模板编辑器
+
+- 支持 5 种字段类型：`input`（文本）、`number`（数字）、`select`（下拉选择）、`textarea`（多行文本）、`datetime`（日期时间）
+- `select` 字段支持内联选项或引用数据字典
+- `datetime` 字段支持 `auto_now` 自动填充当前时间
+- 字段可拖拽排序
+- 字段名校验确保唯一性
+
+---
+
+## 十二、用户管理
 
 **"我的"** → **"人员管理"**：
 
@@ -168,7 +286,7 @@
 
 ---
 
-## 十二、角色管理
+## 十三、角色管理
 
 **"我的"** → **"角色与权限管理"**：
 
@@ -183,12 +301,6 @@
 | 人员 | `user_manage` | 管理用户账号 |
 | 角色 | `role_manage` | 管理角色和权限 |
 | 模板 | `template_manage` | 管理模板、工序字典 |
-
----
-
-## 十三、模板管理
-
-**"我的"** → **"流程卡模板管理"**：自定义表头字段和明细字段，支持 text、number、select、textarea、datetime 五种类型。
 
 ---
 
@@ -209,6 +321,25 @@ A: TabBar 根据用户权限动态显示，无权限的标签不会出现。
 **Q: 二维码可以重复扫描吗？**
 A: 二维码含工单号，对应卡片未被锁定时可扫码填报。已完工/作废的卡片无法再锁定。
 
+---
 
-1.工序卡控
-2.机台和账户绑定，筛选填报内容
+## 注意事项
+
+- **禁止**修改 `miniprogram_npm/` 目录下的文件（npm 构建产物）
+- 云环境 ID: `cloud1-d3gtr9e3m940ddbfb`
+- 支持分包加载，TDesign 示例页按组件分包
+- 自定义 TabBar 在 `custom-tab-bar/` 中实现
+- 深色模式变量定义在 `theme.json` 中
+
+
+1.微信云程序转为移动端app
+2.设置工序权限，可以给账户分配工序权限，例如现在有光刻，压印，切割 3个工序，我只给账户A分配了光刻的填写权限，那么A就只能在这张流程卡中看到填写光刻这个工序的信息，如果给A分配了光刻，压印，切割 3个权限，那么他就3个工序都能看到，都能填写。
+2.工序卡控：若上道工序未完成报功下端工序无法报功，弹出提示
+3.工单号编码规则：同一批货 前后道工序会分为两张工单，你可以理解为一个成品，前道工序产出半成品，后道工序产出完成品。在工单编码上 前后道 前9位完全相同，后1位代表前道工序，0代表后道工序。
+4.在制品定义：例如当前流程卡中有三道工序，光刻，压印，切割，当工作人员完成光刻的报工，流程卡和物料流转到下一个工段，那么此时该批物料就可以算作压印在制品。
+5.在制品某个工段呆滞时间计算：当完成上道工段报工后，开始计算呆滞时间。若在早上8点完成光刻报工，10点钟压印工段还没报工，那么呆滞时间就是2小时
+6.新增良率计算功能，计算公式待业务人员提交
+7.导出的报表要填入excel，或者汇集成excel
+
+
+

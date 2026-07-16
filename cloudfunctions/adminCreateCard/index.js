@@ -48,6 +48,11 @@ function buildDynamicStep(stepName, sort, detailFields) {
     sort: sort,
     device_no: '',
     fixture_no: '',
+    prod_started_at: null,
+    prod_completed_at: null,
+    prod_completed_by: null,
+    qc_completed_at: null,
+    qc_completed_by: null,
     depts: [
       Object.assign({ dept_name: '生产' }, deptFields),
       Object.assign({ dept_name: '品质' }, deptFields)
@@ -121,8 +126,11 @@ exports.main = async (event, context) => {
         template_id,
         header_data: builtHeaderData,
         dynamic_steps: dynamicSteps,
+        current_step: stepNames[0],
+        current_step_index: 0,
         warehouse_personnel: '',
         warehouse_date: '',
+        warehouse_status: '',
         status: '加工中',
         is_locked: false,
         locked_by: '',

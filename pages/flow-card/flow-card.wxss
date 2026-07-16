@@ -11,6 +11,199 @@
   box-sizing: border-box;
 }
 
+/* ===== 工序进度概览 ===== */
+.fc-progress {
+  background: var(--td-bg-color-container, #ffffff);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.fc-progress__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 24rpx;
+  color: var(--td-text-color-secondary, #909399);
+  margin-bottom: 16rpx;
+}
+
+.fc-progress__curr {
+  font-weight: 600;
+  color: #0052D9;
+}
+
+.fc-progress__bar {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  overflow-x: auto;
+  padding-bottom: 8rpx;
+}
+
+.fc-step-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  padding: 8rpx 12rpx;
+  border-radius: 12rpx;
+  background: var(--td-bg-color-component, #f0f0f0);
+  min-width: 80rpx;
+}
+
+.fc-step-dot--prod {
+  background: rgba(0, 82, 217, 0.1);
+  border: 1rpx solid rgba(0, 82, 217, 0.3);
+}
+
+.fc-step-dot--qc {
+  background: rgba(0, 82, 217, 0.15);
+}
+
+.fc-step-dot--current {
+  background: #0052D9;
+  border-color: #0052D9;
+}
+
+.fc-step-dot--current .fc-step-dot__name {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.fc-step-dot__name {
+  font-size: 20rpx;
+  color: var(--td-text-color-secondary, #909399);
+  white-space: nowrap;
+}
+
+.fc-step-dot__badges {
+  display: flex;
+  gap: 4rpx;
+}
+
+.fc-badge {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 6rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  line-height: 28rpx;
+  text-align: center;
+}
+
+.fc-badge--prod {
+  background: #0052D9;
+  color: #ffffff;
+}
+
+.fc-badge--qc {
+  background: #e37318;
+  color: #ffffff;
+}
+
+/* ===== SLA 呆滞时间 ===== */
+.fc-sla {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 24rpx;
+  margin-bottom: 16rpx;
+  background: rgba(227, 115, 24, 0.08);
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #e37318;
+  font-weight: 500;
+}
+
+/* ===== Quality Gate 警告 ===== */
+.fc-qc-warn {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 24rpx;
+  margin-bottom: 16rpx;
+  background: rgba(227, 77, 89, 0.08);
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #e34d59;
+  font-weight: 500;
+}
+
+/* ===== 填报类型切换 ===== */
+.fc-dept-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--td-bg-color-component, #f0f0f0);
+  border-radius: 10rpx;
+  padding: 4rpx;
+  margin-bottom: 20rpx;
+}
+
+.fc-dept-tab {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 12rpx;
+  font-size: 26rpx;
+  color: var(--td-text-color-secondary, #909399);
+  border-radius: 8rpx;
+}
+
+.fc-dept-tab--active {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.fc-dept-tab--prod.fc-dept-tab--active {
+  background: #0052D9;
+}
+
+.fc-dept-tab--qc.fc-dept-tab--active {
+  background: #e37318;
+}
+
+.fc-dept-tab--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ===== 工序状态 ===== */
+.fc-step__status {
+  display: flex;
+  gap: 12rpx;
+}
+
+.fc-step__done {
+  font-size: 22rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  background: rgba(0, 168, 112, 0.1);
+  color: #00a870;
+  font-weight: 500;
+}
+
+.fc-dept__done-tag {
+  font-size: 22rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  background: rgba(0, 82, 217, 0.08);
+  color: #0052D9;
+  margin-left: 12rpx;
+}
+
+.fc-qc-gate-hint {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 16rpx;
+  padding: 12rpx 16rpx;
+  background: rgba(227, 77, 89, 0.06);
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  color: #e34d59;
+}
+
 /* ===== 头部信息 ===== */
 .fc-header {
   background: var(--td-bg-color-container, #ffffff);
@@ -92,32 +285,15 @@
 }
 
 .fc-step__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 32rpx;
   font-weight: 700;
   color: var(--td-brand-color-7, #0052d9);
   border-bottom: 2rpx solid #eee;
   padding-bottom: 16rpx;
   margin-bottom: 20rpx;
-}
-
-.fc-step__devices {
-  display: flex;
-  gap: 24rpx;
-  margin-bottom: 20rpx;
-}
-
-.fc-step__device {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.fc-step__device-label {
-  font-size: 24rpx;
-  color: var(--td-text-color-secondary, #909399);
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .fc-step__depts {

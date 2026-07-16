@@ -48,6 +48,7 @@ exports.main = async (event, context) => {
       department: auth.user.department || '',
       phone: auth.user.phone || '',
       role_id: auth.user.role_id,
+      workstation: auth.user.workstation || [],
       status: auth.user.status,
       created_at: auth.user.created_at,
       last_login: auth.user.last_login

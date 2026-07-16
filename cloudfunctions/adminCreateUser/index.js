@@ -39,7 +39,7 @@ async function authenticate(event) {
 }
 
 exports.main = async (event, context) => {
-  const { username, password, real_name, department, role_id, phone } = event;
+  const { username, password, real_name, department, role_id, phone, workstation } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -77,6 +77,7 @@ exports.main = async (event, context) => {
       real_name: real_name || '',
       department: department || '',
       phone: phone || '',
+      workstation: Array.isArray(workstation) ? workstation.filter(s => s) : (workstation ? [workstation] : []),
       status: 'active',
       created_at: db.serverDate(),
       last_login: null

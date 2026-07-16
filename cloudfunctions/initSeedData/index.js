@@ -9,7 +9,16 @@ function hashPassword(password, salt) {
 }
 
 function buildStep(stepName, sort, detailFields) {
-  const step = { step_name: stepName, sort };
+  const step = {
+    step_name: stepName, sort,
+    device_no: '',
+    fixture_no: '',
+    prod_started_at: null,
+    prod_completed_at: null,
+    prod_completed_by: null,
+    qc_completed_at: null,
+    qc_completed_by: null
+  };
   detailFields.forEach(f => {
     const defaultVal = f.default || (f.type === 'number' ? 0 : '');
     step['prod_' + f.field_name] = defaultVal;
@@ -164,6 +173,7 @@ exports.main = async (event, context) => {
           real_name: '系统管理员',
           department: '信息部',
           phone: '',
+          workstation: [],
           status: 'active',
           created_at: db.serverDate(),
           last_login: null
@@ -177,7 +187,8 @@ exports.main = async (event, context) => {
     const SEED_DICTS = [
       { dict_id: 'process_type', dict_name: '制程类型', options: ['开始注塑', '保压成型', '冷却定型', '开模取件'] },
       { dict_id: 'defect_reason', dict_name: '不良原因', options: ['气泡', '缺料', '飞边', '变形', '尺寸超差'] },
-      { dict_id: 'process_list', dict_name: '工序列表', options: ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割', '冲压', '折弯', '焊接', '喷涂', '组装', '测试', '车削', '铣削', '磨削', '电镀', '包装', '注塑', 'CNC加工', '抛光', '清洗', '烘干', '打标', '目检', '全检', '成品入库'] }
+      { dict_id: 'process_list', dict_name: '工序列表', options: ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割', '冲压', '折弯', '焊接', '喷涂', '组装', '测试', '车削', '铣削', '磨削', '电镀', '包装', '注塑', 'CNC加工', '抛光', '清洗', '烘干', '打标', '目检', '全检', '成品入库'] },
+      { dict_id: 'department_list', dict_name: '部门列表', options: ['生产部', '品质部', '信息部', '仓储部', '设备部', '工艺部'] }
     ];
     for (const d of SEED_DICTS) {
       const existDict = await db.collection('sys_dicts').where({ dict_id: d.dict_id }).get();
@@ -231,8 +242,11 @@ exports.main = async (event, context) => {
             template_id: DEFAULT_TEMPLATE.template_id,
             header_data: c.header_data,
             steps: builtSteps,
+            current_step: builtSteps[0].step_name,
+            current_step_index: 0,
             warehouse_personnel: '',
             warehouse_date: '',
+            warehouse_status: '',
             status: '加工中',
             is_locked: false,
             locked_by: '',
@@ -247,7 +261,136 @@ exports.main = async (event, context) => {
       }
     }
 
-    results.msg = '初始化完成。默认管理员：admin / admin123。测试工单：A260130011（7道工序）、A260130012（6道工序）。模板：TPL_FLOW_01';
+    // ===== 测试用户 =====
+    const SEED_TEST_USERS = [
+      { username: 'zhangshan', password: 'test123', real_name: '张三山', department: '生产部', role_id: 'operator', workstation: ['压印'] },
+      { username: 'lisi', password: 'test123', real_name: '李四', department: '品质部', role_id: 'qc', workstation: ['压印', '光刻'] },
+      { username: 'wangwu', password: 'test123', real_name: '王五', department: '生产部', role_id: 'operator', workstation: ['光刻'] }
+    ];
+    for (const u of SEED_TEST_USERS) {
+      const existUser = await db.collection('sys_users').where({ username: u.username }).get();
+      if (existUser.data.length === 0) {
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = hashPassword(u.password, salt);
+        await db.collection('sys_users').add({
+          data: {
+            username: u.username,
+            password_salt: salt,
+            password_hash: hash,
+            role_id: u.role_id,
+            real_name: u.real_name,
+            department: u.department,
+            phone: '',
+            workstation: u.workstation,
+            status: 'active',
+            created_at: db.serverDate(),
+            last_login: null
+          }
+        });
+        results.created.push('sys_users: ' + u.username + ' / ' + u.password + ' 工段=' + u.workstation.join(','));
+      } else {
+        results.skipped.push('sys_users: ' + u.username + ' 已存在');
+      }
+    }
+
+    // ===== 测试流转卡（带工序状态）=====
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000);
+    const nowStr = now.toISOString();
+    const oneHourStr = oneHourAgo.toISOString();
+    const halfHourStr = halfHourAgo.toISOString();
+
+    const emptyDeptFields = {};
+    detailFields.forEach(f => {
+      emptyDeptFields[f.field_name] = f.default || (f.type === 'number' ? 0 : '');
+    });
+
+    const testCard = {
+      order_no: 'TEST001',
+      template_id: DEFAULT_TEMPLATE.template_id,
+      header_data: { project_name: '测试项目-SLA验证', order_date: '2026-07-16' },
+      dynamic_steps: [
+        {
+          step_name: '压印', sort: 1, device_no: '', fixture_no: '',
+          prod_started_at: oneHourStr,
+          prod_completed_at: halfHourStr,
+          prod_completed_by: '张三山',
+          qc_completed_at: null,
+          qc_completed_by: null,
+          depts: [
+            Object.assign({ dept_name: '生产' }, emptyDeptFields),
+            Object.assign({ dept_name: '品质' }, emptyDeptFields)
+          ]
+        },
+        {
+          step_name: '光刻', sort: 2, device_no: '', fixture_no: '',
+          prod_started_at: nowStr,
+          prod_completed_at: null,
+          prod_completed_by: null,
+          qc_completed_at: null,
+          qc_completed_by: null,
+          depts: [
+            Object.assign({ dept_name: '生产' }, emptyDeptFields),
+            Object.assign({ dept_name: '品质' }, emptyDeptFields)
+          ]
+        },
+        {
+          step_name: '镀AR', sort: 3, device_no: '', fixture_no: '',
+          prod_started_at: null,
+          prod_completed_at: null,
+          prod_completed_by: null,
+          qc_completed_at: null,
+          qc_completed_by: null,
+          depts: [
+            Object.assign({ dept_name: '生产' }, emptyDeptFields),
+            Object.assign({ dept_name: '品质' }, emptyDeptFields)
+          ]
+        },
+        {
+          step_name: '镀Ti', sort: 4, device_no: '', fixture_no: '',
+          prod_started_at: null,
+          prod_completed_at: null,
+          prod_completed_by: null,
+          qc_completed_at: null,
+          qc_completed_by: null,
+          depts: [
+            Object.assign({ dept_name: '生产' }, emptyDeptFields),
+            Object.assign({ dept_name: '品质' }, emptyDeptFields)
+          ]
+        }
+      ]
+    };
+
+    const existTestCard = await db.collection('process_cards').where({ order_no: testCard.order_no }).get();
+    if (existTestCard.data.length === 0) {
+      await db.collection('process_cards').add({
+        data: {
+          order_no: testCard.order_no,
+          template_id: testCard.template_id,
+          header_data: testCard.header_data,
+          dynamic_steps: testCard.dynamic_steps,
+          current_step: '光刻',
+          current_step_index: 1,
+          warehouse_personnel: '',
+          warehouse_date: '',
+          warehouse_status: '',
+          status: '加工中',
+          is_locked: false,
+          locked_by: '',
+          locked_by_user_id: '',
+          lock_time: null,
+          created_at: db.serverDate(),
+          created_by: 'admin',
+          last_updated: db.serverDate()
+        }
+      });
+      results.created.push('process_cards: ' + testCard.order_no + '（4道工序，压印已完成/光刻WIP/镀AR镀Ti未开始）');
+    } else {
+      results.skipped.push('process_cards: ' + testCard.order_no + ' 已存在');
+    }
+
+    results.msg = '初始化完成。管理员：admin/admin123。测试账户：zhangshan/test123(压印)、lisi/test123(压印+光刻QC)、wangwu/test123(光刻)。测试工单：TEST001(4道工序/压印已完成/光刻WIP/品质待补)、A260130011、A260130012。模板：TPL_FLOW_01';
     return results;
   } catch (err) {
     return { success: false, msg: '初始化失败：' + (err.errMsg || err.message || '未知错误'), error: err };

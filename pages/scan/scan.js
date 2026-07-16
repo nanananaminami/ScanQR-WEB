@@ -4,7 +4,8 @@ Page({
   data: {
     loading: false,
     lastOrderNo: '',
-    operatorName: ''
+    operatorName: '',
+    workstation: []
   },
 
   onLoad() {
@@ -16,7 +17,8 @@ Page({
     const session = auth.getSession() || {};
     const defaultName = (session.user && (session.user.real_name || session.user.username)) || '操作员';
     const name = wx.getStorageSync('operator_name') || defaultName;
-    this.setData({ operatorName: name });
+    const workstation = (session.user && session.user.workstation) || [];
+    this.setData({ operatorName: name, workstation: workstation });
     const last = wx.getStorageSync('last_order_no');
     if (last) this.setData({ lastOrderNo: last });
   },
@@ -76,7 +78,8 @@ Page({
         app.globalData.lockedCard = {
           cardData: result.cardData,
           templateData: result.templateData,
-          operator: operatorName
+          operator: operatorName,
+          match: result.match || null
         };
         wx.setStorageSync('last_order_no', orderNo);
         this.setData({ lastOrderNo: orderNo });

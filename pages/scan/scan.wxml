@@ -10,6 +10,10 @@
   </view>
 
   <view class="scan-actions">
+    <view wx:if="{{workstation.length > 0}}" class="scan-ws-badge">
+      <t-icon name="user" size="28rpx" />
+      <text>当前工段：{{workstation.join('、')}}</text>
+    </view>
     <t-button theme="primary" block size="large" bind:tap="handleScan" loading="{{loading}}">
       扫码上锁
     </t-button>

@@ -49,6 +49,17 @@
   word-break: break-all;
 }
 
+.cd-row__value--step {
+  color: #e37318;
+  font-weight: 600;
+}
+
+.cd-row__value--blocked {
+  color: #e34d59;
+  font-weight: 600;
+  font-size: 24rpx;
+}
+
 /* 工序明细 */
 .cd-step {
   padding: 20rpx 0;
@@ -60,35 +71,52 @@
 }
 
 .cd-step__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
   font-size: 30rpx;
   font-weight: 600;
   color: var(--td-brand-color-7, #0052d9);
-  margin-bottom: 12rpx;
+  margin-bottom: 8rpx;
 }
 
-.cd-step__devices {
+.cd-step__status-tags {
   display: flex;
-  gap: 24rpx;
-  margin-bottom: 16rpx;
+  gap: 6rpx;
 }
 
-.cd-step__device {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.cd-step__device-label {
-  font-size: 24rpx;
-  color: var(--td-text-color-secondary, #909399);
-  white-space: nowrap;
-}
-
-.cd-step__device-value {
-  font-size: 26rpx;
-  color: var(--td-text-color-primary, #303133);
+.cd-step__tag {
+  font-size: 20rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
   font-weight: 500;
+}
+
+.cd-step__tag--prod { background: rgba(0, 82, 217, 0.1); color: #0052D9; }
+.cd-step__tag--wip { background: rgba(227, 115, 24, 0.1); color: #e37318; }
+.cd-step__tag--wait { background: rgba(144, 147, 153, 0.1); color: #909399; }
+.cd-step__tag--qc { background: rgba(0, 168, 112, 0.1); color: #00a870; }
+
+.cd-step__info {
+  font-size: 22rpx;
+  color: var(--td-text-color-secondary, #909399);
+  margin-bottom: 6rpx;
+  padding-left: 4rpx;
+}
+
+.cd-sla {
+  font-size: 22rpx;
+  color: #e37318;
+  margin-bottom: 10rpx;
+  padding: 8rpx 12rpx;
+  background: rgba(227, 115, 24, 0.06);
+  border-radius: 6rpx;
+}
+
+.cd-sla__value {
+  font-weight: 600;
 }
 
 .cd-dept {

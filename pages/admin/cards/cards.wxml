@@ -33,6 +33,14 @@
           <text class="card-item__label">工序数</text>
           <text class="card-item__value">{{item.stepCount}} 道</text>
         </view>
+        <view class="card-item__row" wx:if="{{item.stepProgress}}">
+          <text class="card-item__label">进度</text>
+          <text class="card-item__value card-item__value--progress">产{{item.stepProgress}}</text>
+        </view>
+        <view class="card-item__row" wx:if="{{item.currentStep}}">
+          <text class="card-item__label">当前工段</text>
+          <text class="card-item__value card-item__value--step">{{item.currentStep}}</text>
+        </view>
         <view class="card-item__row" wx:if="{{item.is_locked}}">
           <text class="card-item__label">持有人</text>
           <text class="card-item__value">{{item.locked_by || '未知'}}</text>

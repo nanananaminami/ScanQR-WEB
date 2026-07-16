@@ -44,13 +44,65 @@ exports.main = async (event, context) => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [todayLogs, activeCards, lockedCards, todayExceptions, totalLogs] = await Promise.all([
+    const [todayLogs, activeCards, lockedCards, todayExceptions, totalLogs, activeCardsData] = await Promise.all([
       db.collection('process_logs').where({ submit_time: _.gte(todayStart) }).count(),
       db.collection('process_cards').where({ status: '加工中' }).count(),
       db.collection('process_cards').where({ is_locked: true }).count(),
       db.collection('process_logs').where({ submit_time: _.gte(todayStart), cancelled: true }).count(),
-      db.collection('process_logs').count()
+      db.collection('process_logs').count(),
+      db.collection('process_cards').where({ status: '加工中' }).field({
+        order_no: true, current_step: true, current_step_index: true,
+        dynamic_steps: true, steps: true
+      }).get()
     ]);
+
+    const wipByWorkstation = {};
+    const slaBottlenecks = [];
+    const now = new Date();
+
+    (activeCardsData.data || []).forEach(card => {
+      const steps = card.dynamic_steps || card.steps || [];
+      if (steps.length === 0) return;
+
+      const stepIndex = card.current_step_index !== undefined ? card.current_step_index : 0;
+      const currentStep = steps[stepIndex];
+      if (!currentStep || !currentStep.step_name) return;
+
+      const ws = currentStep.step_name;
+
+      if (!wipByWorkstation[ws]) {
+        wipByWorkstation[ws] = { workstation: ws, wip_count: 0, card_list: [] };
+      }
+      wipByWorkstation[ws].wip_count += 1;
+      wipByWorkstation[ws].card_list.push(card.order_no);
+
+      if (stepIndex > 0 && currentStep.prod_started_at) {
+        const prevStep = steps[stepIndex - 1];
+        if (prevStep && prevStep.prod_completed_at) {
+          const prevCompleted = new Date(prevStep.prod_completed_at);
+          const startedAt = new Date(currentStep.prod_started_at);
+          const waitMinutes = Math.floor((startedAt.getTime() - prevCompleted.getTime()) / 60000);
+          if (waitMinutes > 0) {
+            slaBottlenecks.push({
+              order_no: card.order_no,
+              from_step: prevStep.step_name,
+              to_step: currentStep.step_name,
+              wait_minutes: waitMinutes
+            });
+          }
+        }
+      }
+    });
+
+    slaBottlenecks.sort((a, b) => b.wait_minutes - a.wait_minutes);
+    const topSlaBottlenecks = slaBottlenecks.slice(0, 10).map(b => ({
+      ...b,
+      wait_text: b.wait_minutes >= 1440
+        ? Math.floor(b.wait_minutes / 1440) + '天' + (b.wait_minutes % 1440 >= 60 ? Math.floor((b.wait_minutes % 1440) / 60) + '小时' : '')
+        : (b.wait_minutes >= 60
+          ? Math.floor(b.wait_minutes / 60) + '小时' + (b.wait_minutes % 60) + '分'
+          : b.wait_minutes + '分钟')
+    }));
 
     return {
       success: true,
@@ -59,7 +111,9 @@ exports.main = async (event, context) => {
         activeCards: activeCards.total,
         lockedCards: lockedCards.total,
         todayExceptions: todayExceptions.total,
-        totalLogs: totalLogs.total
+        totalLogs: totalLogs.total,
+        wipByWorkstation: Object.values(wipByWorkstation),
+        slaBottlenecks: topSlaBottlenecks
       }
     };
   } catch (err) {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "shell": "pwsh",
+  "shell": "zsh",
   "watcher": {
     "ignore": [
       ".cloudbase/**",
@@ -12,6 +12,9 @@
     "edit": "ask",
     "bash": "ask",
     "external_directory": "deny"
+  },
+  "skills": {
+    "paths": [".opencode/skills"]
   },
   "instructions": [
     "AGENTS.md"

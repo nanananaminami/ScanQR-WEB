@@ -6,6 +6,8 @@ Page({
     users: [],
     roles: [],
     roleFilter: 'all',
+    departmentList: [],
+    processList: [],
     showCreate: false,
     form: {
       username: '',
@@ -13,9 +15,15 @@ Page({
       real_name: '',
       department: '',
       role_id: '',
-      phone: ''
+      phone: '',
+      workstation: []
     },
-    creating: false
+    creating: false,
+    showWsPicker: false,
+    wsSearchKeyword: '',
+    wsFilteredOptions: [],
+    wsSelected: [],
+    wsChecked: {}
   },
 
   onLoad() {
@@ -32,14 +40,21 @@ Page({
     this.setData({ loading: true });
     Promise.all([
       auth.callWithAuth('getUserList'),
-      auth.callWithAuth('getRoleList')
-    ]).then(([uRes, rRes]) => {
+      auth.callWithAuth('getRoleList'),
+      auth.callWithAuth('getDictList')
+    ]).then(([uRes, rRes, dRes]) => {
       const u = uRes.result || {};
       const r = rRes.result || {};
+      const d = dRes.result || {};
       if (u.success && r.success) {
+        const dicts = d.dicts || [];
+        const deptDict = dicts.find(x => x.dict_id === 'department_list');
+        const procDict = dicts.find(x => x.dict_id === 'process_list');
         this.setData({
           users: (u.users || []).map(x => this.formatUser(x)),
           roles: r.roles || [],
+          departmentList: deptDict ? (deptDict.options || []) : [],
+          processList: procDict ? (procDict.options || []) : [],
           loading: false
         });
       } else {
@@ -53,11 +68,14 @@ Page({
   },
 
   formatUser(u) {
+    const ws = u.workstation || [];
+    const wsText = Array.isArray(ws) ? ws.join('、') : ws;
     return Object.assign({}, u, {
       createdText: this.formatDate(u.created_at),
       lastLoginText: this.formatDate(u.last_login),
       statusText: u.status === 'disabled' ? '已禁用' : '正常',
-      statusTheme: u.status === 'disabled' ? 'danger' : 'success'
+      statusTheme: u.status === 'disabled' ? 'danger' : 'success',
+      workstationText: wsText || '-'
     });
   },
 
@@ -83,7 +101,8 @@ Page({
         real_name: '',
         department: '',
         role_id: defaultRoleId,
-        phone: ''
+        phone: '',
+        workstation: []
       }
     });
   },
@@ -107,6 +126,96 @@ Page({
         if (role) this.setData({ 'form.role_id': role.role_id });
       }
     });
+  },
+
+  pickDepartment() {
+    const list = this.data.departmentList;
+    if (list.length === 0) {
+      wx.showToast({ title: '暂无部门数据', icon: 'none' });
+      return;
+    }
+    wx.showActionSheet({
+      itemList: list,
+      success: (res) => {
+        this.setData({ 'form.department': list[res.tapIndex] });
+      }
+    });
+  },
+
+  openWsPicker(e) {
+    const mode = e.currentTarget.dataset.mode;
+    const selected = mode === 'edit' ? (e.currentTarget.dataset.selected || []) : this.data.form.workstation;
+    const wsArr = Array.isArray(selected) ? selected.slice() : (selected ? [selected] : []);
+    const checked = {};
+    const list = this.data.processList.slice();
+    list.forEach(name => { checked[name] = wsArr.indexOf(name) !== -1; });
+    this.setData({
+      showWsPicker: true,
+      wsPickerMode: mode || 'create',
+      wsPickerUserId: mode === 'edit' ? (e.currentTarget.dataset.userid || '') : '',
+      wsSearchKeyword: '',
+      wsFilteredOptions: list,
+      wsSelected: wsArr,
+      wsChecked: checked
+    });
+  },
+
+  closeWsPicker() {
+    this.setData({ showWsPicker: false });
+  },
+
+  onWsSearchChange(e) {
+    const keyword = (e.detail.value || '').toLowerCase().trim();
+    const list = this.data.processList;
+    const filtered = keyword
+      ? list.filter(s => s.toLowerCase().indexOf(keyword) !== -1)
+      : list.slice();
+    this.setData({ wsSearchKeyword: keyword, wsFilteredOptions: filtered });
+  },
+
+  clearWsSearch() {
+    this.setData({ wsSearchKeyword: '', wsFilteredOptions: this.data.processList.slice() });
+  },
+
+  toggleWsOption(e) {
+    const val = e.currentTarget.dataset.value;
+    const selected = this.data.wsSelected.slice();
+    const checked = Object.assign({}, this.data.wsChecked);
+    const idx = selected.indexOf(val);
+    if (idx !== -1) {
+      selected.splice(idx, 1);
+      checked[val] = false;
+    } else {
+      selected.push(val);
+      checked[val] = true;
+    }
+    this.setData({ wsSelected: selected, wsChecked: checked });
+  },
+
+  confirmWsPicker() {
+    const { wsSelected, wsPickerMode, wsPickerUserId } = this.data;
+    if (wsPickerMode === 'edit') {
+      wx.showLoading({ title: '更新中...' });
+      auth.callWithAuth('adminUpdateUser', {
+        user_id: wsPickerUserId,
+        workstation: wsSelected
+      }).then((r) => {
+        wx.hideLoading();
+        const result = r.result || {};
+        if (result.success) {
+          wx.showToast({ title: '已更新', icon: 'success' });
+          this.loadAll();
+        } else {
+          wx.showModal({ title: '更新失败', content: result.msg || '请重试', showCancel: false });
+        }
+      }).catch(() => {
+        wx.hideLoading();
+        wx.showToast({ title: '更新失败', icon: 'none' });
+      });
+    } else {
+      this.setData({ 'form.workstation': wsSelected });
+    }
+    this.setData({ showWsPicker: false });
   },
 
   submitCreate() {
@@ -144,13 +253,46 @@ Page({
     const index = e.currentTarget.dataset.index;
     const user = this.data.users[index];
     if (!user) return;
-    const itemList = ['修改角色', '重置密码', user.status === 'disabled' ? '启用账号' : '禁用账号'];
+    const itemList = ['修改角色', '修改部门', '修改工段', '重置密码', user.status === 'disabled' ? '启用账号' : '禁用账号'];
     wx.showActionSheet({
       itemList,
       success: (res) => {
         if (res.tapIndex === 0) this.changeRole(user);
-        else if (res.tapIndex === 1) this.resetPassword(user);
-        else if (res.tapIndex === 2) this.toggleStatus(user);
+        else if (res.tapIndex === 1) this.changeDepartment(user);
+        else if (res.tapIndex === 2) this.openWsPicker({ currentTarget: { dataset: { mode: 'edit', selected: user.workstation || [], userid: user._id } } });
+        else if (res.tapIndex === 3) this.resetPassword(user);
+        else if (res.tapIndex === 4) this.toggleStatus(user);
+      }
+    });
+  },
+
+  changeDepartment(user) {
+    const list = this.data.departmentList;
+    if (list.length === 0) {
+      wx.showToast({ title: '暂无部门数据', icon: 'none' });
+      return;
+    }
+    wx.showActionSheet({
+      itemList: list,
+      success: (res) => {
+        const dept = list[res.tapIndex];
+        wx.showLoading({ title: '更新中...' });
+        auth.callWithAuth('adminUpdateUser', {
+          user_id: user._id,
+          department: dept
+        }).then((r) => {
+          wx.hideLoading();
+          const result = r.result || {};
+          if (result.success) {
+            wx.showToast({ title: '已更新', icon: 'success' });
+            this.loadAll();
+          } else {
+            wx.showModal({ title: '更新失败', content: result.msg || '请重试', showCancel: false });
+          }
+        }).catch(() => {
+          wx.hideLoading();
+          wx.showToast({ title: '更新失败', icon: 'none' });
+        });
       }
     });
   },

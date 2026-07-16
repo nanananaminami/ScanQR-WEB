@@ -31,6 +31,7 @@
           </view>
         </view>
         <view class="user-item__meta">账号：{{item.username}} · 部门：{{item.department || '-'}}</view>
+        <view class="user-item__meta">工段：{{item.workstationText}}</view>
         <view class="user-item__meta">注册：{{item.createdText}} · 最近登录：{{item.lastLoginText}}</view>
       </view>
     </view>
@@ -60,7 +61,10 @@
     </view>
     <view class="form-row">
       <text class="form-label">部门</text>
-      <t-input value="{{form.department}}" placeholder="如 质检车间" data-field="department" bind:change="onFormChange" />
+      <view class="role-picker" bindtap="pickDepartment">
+        <text class="role-picker__text">{{form.department || '请选择'}}</text>
+        <t-icon name="chevron-right" size="32rpx" />
+      </view>
     </view>
     <view class="form-row">
       <text class="form-label">绑定角色 *</text>
@@ -69,9 +73,52 @@
         <t-icon name="chevron-right" size="32rpx" />
       </view>
     </view>
+    <view class="form-row">
+      <text class="form-label">所属工段</text>
+      <view class="ws-tags" bindtap="openWsPicker" data-mode="create">
+        <view wx:if="{{form.workstation.length > 0}}" class="ws-tags__list">
+          <text class="ws-tag" wx:for="{{form.workstation}}" wx:for-item="w" wx:key="*this">{{w}}</text>
+        </view>
+        <text wx:else class="ws-tags__ph">点击选择工段（可多选）</text>
+        <t-icon name="chevron-right" size="32rpx" style="color:#909399;" />
+      </view>
+    </view>
   </view>
   <view class="create-panel__actions">
     <t-button theme="default" variant="outline" bind:tap="closeCreate">取消</t-button>
     <t-button theme="primary" bind:tap="submitCreate" loading="{{creating}}">创建</t-button>
+  </view>
+</view>
+
+<!-- 工段多选模糊搜索面板 -->
+<view class="search-mask" wx:if="{{showWsPicker}}" bindtap="closeWsPicker"></view>
+<view class="search-panel" wx:if="{{showWsPicker}}">
+  <view class="search-panel__header">
+    <text class="search-panel__title">选择工段（已选 {{wsSelected.length}} 个）</text>
+    <view class="search-panel__close" catchtap="closeWsPicker">
+      <t-icon name="close" size="40rpx" />
+    </view>
+  </view>
+  <view class="search-panel__search">
+    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
+    <input class="search-panel__input" value="{{wsSearchKeyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onWsSearchChange" />
+    <text class="search-panel__clear" wx:if="{{wsSearchKeyword}}" catchtap="clearWsSearch">清除</text>
+  </view>
+  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="search-panel__item {{wsChecked[ws] ? 'search-panel__item--checked' : ''}}"
+          wx:for="{{wsFilteredOptions}}" wx:for-item="ws" wx:key="*this"
+          data-value="{{ws}}" bindtap="toggleWsOption">
+      <view class="search-panel__checkbox {{wsChecked[ws] ? 'search-panel__checkbox--on' : ''}}">
+        <t-icon wx:if="{{wsChecked[ws]}}" name="check" size="28rpx" style="color:#fff;" />
+      </view>
+      <text>{{ws}}</text>
+    </view>
+    <view class="search-panel__empty" wx:if="{{wsFilteredOptions.length === 0}}">
+      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
+      <text>未找到匹配 "{{wsSearchKeyword}}"</text>
+    </view>
+  </scroll-view>
+  <view class="search-panel__footer">
+    <t-button theme="primary" block bind:tap="confirmWsPicker">确认选择</t-button>
   </view>
 </view>

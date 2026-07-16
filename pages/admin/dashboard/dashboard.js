@@ -8,7 +8,9 @@ Page({
       activeCards: 0,
       lockedCards: 0,
       todayExceptions: 0,
-      totalLogs: 0
+      totalLogs: 0,
+      wipByWorkstation: [],
+      slaBottlenecks: []
     },
     userName: ''
   },

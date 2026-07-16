@@ -6,7 +6,31 @@
 
 <view class="fc-page" wx:if="{{!loading && cardData}}">
 
-  <!-- 1. 动态表头 -->
+  <!-- 工序进度概览 -->
+  <view class="fc-progress" wx:if="{{match}}">
+    <view class="fc-progress__title">
+      <text>工序进度</text>
+      <text class="fc-progress__curr">{{cardData.current_step || (dynamicSteps[0] && dynamicSteps[0].step_name)}}</text>
+    </view>
+    <view class="fc-progress__bar">
+      <view class="fc-step-dot {{s.prod_completed_at ? 'fc-step-dot--prod' : ''}} {{s.qc_completed_at ? 'fc-step-dot--qc' : ''}} {{currentStepMap[s.step_name] ? 'fc-step-dot--current' : ''}}"
+            wx:for="{{match.all_steps_summary}}" wx:for-item="s" wx:for-index="si" wx:key="step_name">
+        <text class="fc-step-dot__name">{{s.step_name}}</text>
+        <view class="fc-step-dot__badges">
+          <text wx:if="{{s.prod_completed_at}}" class="fc-badge fc-badge--prod">产</text>
+          <text wx:if="{{s.qc_completed_at}}" class="fc-badge fc-badge--qc">质</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Quality Gate 提醒 -->
+  <view class="fc-qc-warn" wx:if="{{qualityGateWarning && match.missing_qc_steps.length > 0}}">
+    <t-icon name="error-circle" size="32rpx" style="color:#e34d59;" />
+    <text>前置品质待补：{{match.missing_qc_steps.join('、')}}</text>
+  </view>
+
+  <!-- 动态表头 -->
   <view class="fc-header">
     <view class="fc-header__title">流转卡</view>
     <view class="fc-header__rows">
@@ -43,92 +67,130 @@
     </view>
   </view>
 
-  <!-- 2. 动态工序列表（核心：数据库有几道工序，这里就渲染几张卡） -->
-  <view class="fc-steps">
-    <view class="fc-step" wx:for="{{dynamicSteps}}" wx:key="sort" wx:for-index="mainIndex">
+  <!-- 工段用户：多工序卡片 -->
+  <block wx:if="{{matchedStepsData.length > 0}}">
+    <view class="fc-steps">
+      <view class="fc-step" wx:for="{{matchedStepsData}}" wx:for-item="ms" wx:for-index="msi" wx:key="step_name">
 
-      <!-- 工序标题 -->
-      <view class="fc-step__title">
-        <text>工序 {{mainIndex + 1}}：{{item.step_name}}</text>
-      </view>
-
-      <!-- 工序级：设备号 / 夹具号 -->
-      <view class="fc-step__devices">
-        <view class="fc-step__device">
-          <text class="fc-step__device-label">设备号</text>
-          <t-input value="{{item.device_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless style="padding:0;font-size:26rpx;flex:1;" bind:change="onDeviceChange" />
-        </view>
-        <view class="fc-step__device">
-          <text class="fc-step__device-label">夹具号</text>
-          <t-input value="{{item.fixture_no}}" data-mainindex="{{mainIndex}}" placeholder="-" borderless style="padding:0;font-size:26rpx;flex:1;" bind:change="onFixtureChange" />
-        </view>
-      </view>
-
-      <!-- 部门级：生产 / 品质 双行 -->
-      <view class="fc-step__depts">
-        <view class="fc-dept {{subIndex === 1 ? 'fc-dept--qc' : ''}}" wx:for="{{item.depts}}" wx:for-item="dept" wx:for-index="subIndex" wx:key="dept_name">
-
-          <!-- 部门标签 -->
-          <view class="fc-dept__tag">
-            <t-tag theme="{{dept.dept_name === '生产' ? 'primary' : 'warning'}}" variant="light" size="small">{{dept.dept_name}}</t-tag>
+        <view class="fc-step__title">
+          <text>工序 {{ms.step_index + 1}}：{{ms.step_name}}</text>
+          <view class="fc-step__status">
+            <text wx:if="{{ms.prodCompleted}}" class="fc-step__done">生产已完成</text>
+            <text wx:if="{{ms.qcCompleted}}" class="fc-step__done">品质已完成</text>
           </view>
+        </view>
 
-          <!-- 部门字段网格（列由模板 detail_fields 驱动） -->
-          <view class="fc-dept__fields">
-            <view class="fc-dept__field {{df.type === 'textarea' || df.type === 'datetime' ? 'fc-dept__field--full' : ''}}" wx:for="{{detailFields}}" wx:for-item="df" wx:key="field_name">
+        <!-- SLA 提醒 -->
+        <view class="fc-sla" wx:if="{{ms.sla_text}}">
+          <t-icon name="time" size="32rpx" style="color:#e37318;" />
+          <text>等待时长：{{ms.sla_text}}</text>
+        </view>
 
-              <text class="fc-dept__field-label">{{df.label}}</text>
+        <!-- 卡控提示 -->
+        <view class="fc-sla" wx:if="{{ms.gated}}" style="background:rgba(227,77,89,0.08);color:#e34d59;">
+          <t-icon name="error-circle" size="32rpx" style="color:#e34d59;" />
+          <text>上一道工序生产未完成，生产填报暂不可用</text>
+        </view>
 
-              <t-input wx:if="{{df.type === 'input' || df.type === 'text'}}"
-                value="{{dept[df.field_name]}}"
-                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                placeholder="{{df.placeholder || '-'}}" borderless style="padding:0;font-size:26rpx;"
-                bind:change="onDeptFieldChange" />
+        <!-- 填报类型切换 -->
+        <view class="fc-dept-tabs">
+          <view class="fc-dept-tab {{ms.deptTab === '生产' ? 'fc-dept-tab--active fc-dept-tab--prod' : ''}} {{ms.gated ? 'fc-dept-tab--disabled' : ''}}"
+                data-idx="{{msi}}" data-tab="生产" bindtap="{{ms.gated ? '' : 'switchDeptTab'}}">生产填报</view>
+          <view class="fc-dept-tab {{ms.deptTab === '品质' ? 'fc-dept-tab--active fc-dept-tab--qc' : ''}}"
+                data-idx="{{msi}}" data-tab="品质" bindtap="switchDeptTab">品质填报</view>
+        </view>
 
-              <t-input wx:elif="{{df.type === 'number'}}"
-                value="{{dept[df.field_name]}}"
-                type="number"
-                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                placeholder="0" borderless style="padding:0;font-size:26rpx;"
-                bind:change="onDeptNumberChange" />
-
-              <view wx:elif="{{df.type === 'select'}}"
-                class="fc-dept__select"
-                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" data-options="{{df.options}}"
-                bindtap="openSearchSelect">
-                <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || df.placeholder || '请选择'}}</text>
-                <t-icon name="chevron-down" size="28rpx" />
+        <!-- 工序字段 (生产/品质) -->
+        <view class="fc-step__depts">
+          <view class="fc-dept {{ms.deptTab === '品质' ? 'fc-dept--qc' : ''}}">
+            <view class="fc-dept__tag">
+              <t-tag theme="{{ms.deptTab === '生产' ? 'primary' : 'warning'}}" variant="light" size="small">{{ms.deptTab}}</t-tag>
+            </view>
+            <view class="fc-dept__fields">
+              <view class="fc-dept__field {{df.type === 'textarea' || df.type === 'datetime' ? 'fc-dept__field--full' : ''}}"
+                    wx:for="{{detailFields}}" wx:for-item="df" wx:key="field_name">
+                <text class="fc-dept__field-label">{{df.label}}</text>
+                <t-input wx:if="{{df.type === 'input' || df.type === 'text'}}"
+                  value="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  placeholder="{{df.placeholder || '-'}}" borderless style="padding:0;font-size:26rpx;"
+                  bind:change="onDeptFieldChange" />
+                <t-input wx:elif="{{df.type === 'number'}}"
+                  value="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  type="number"
+                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  placeholder="0" borderless style="padding:0;font-size:26rpx;"
+                  bind:change="onDeptNumberChange" />
+                <view wx:elif="{{df.type === 'select'}}"
+                  class="fc-dept__select"
+                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}" data-options="{{df.options}}"
+                  bindtap="openSearchSelect">
+                  <text class="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || df.placeholder || '请选择'}}</text>
+                  <t-icon name="chevron-down" size="28rpx" />
+                </view>
+                <view wx:elif="{{df.type === 'datetime' && df.auto_now !== false}}"
+                  class="fc-dept__time"
+                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  bindtap="fillDeptTime">
+                  <text class="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '点击记录'}}</text>
+                </view>
+                <view wx:elif="{{df.type === 'datetime' && df.auto_now === false}}"
+                  class="fc-dept__time"
+                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  bindtap="openDatePicker">
+                  <text class="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '选择时间'}}</text>
+                </view>
+                <t-textarea wx:elif="{{df.type === 'textarea'}}"
+                  value="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  placeholder="{{df.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:24rpx;"
+                  bind:change="onDeptFieldChange" />
               </view>
-
-              <view wx:elif="{{df.type === 'datetime' && df.auto_now !== false}}"
-                class="fc-dept__time"
-                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                bindtap="fillDeptTime">
-                <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '点击记录'}}</text>
-              </view>
-              <view wx:elif="{{df.type === 'datetime' && df.auto_now === false}}"
-                class="fc-dept__time"
-                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                bindtap="openDatePicker">
-                <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '选择时间'}}</text>
-              </view>
-
-              <t-textarea wx:elif="{{df.type === 'textarea'}}"
-                value="{{dept[df.field_name]}}"
-                data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}"
-                placeholder="{{df.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:24rpx;"
-                bind:change="onDeptFieldChange" />
-
             </view>
           </view>
+        </view>
 
+      </view>
+    </view>
+  </block>
+
+  <!-- 管理员模式：全部工序编辑 -->
+  <block wx:if="{{matchedStepsData.length === 0}}">
+    <view class="fc-steps">
+      <view class="fc-step" wx:for="{{dynamicSteps}}" wx:key="sort" wx:for-index="mainIndex">
+        <view class="fc-step__title">
+          <text>工序 {{mainIndex + 1}}：{{item.step_name}}</text>
+        </view>
+        <view class="fc-step__depts">
+          <view class="fc-dept {{subIndex === 1 ? 'fc-dept--qc' : ''}}" wx:for="{{item.depts}}" wx:for-item="dept" wx:for-index="subIndex" wx:key="dept_name">
+            <view class="fc-dept__tag">
+              <t-tag theme="{{dept.dept_name === '生产' ? 'primary' : 'warning'}}" variant="light" size="small">{{dept.dept_name}}</t-tag>
+            </view>
+            <view class="fc-dept__fields">
+              <view class="fc-dept__field {{df.type === 'textarea' || df.type === 'datetime' ? 'fc-dept__field--full' : ''}}" wx:for="{{detailFields}}" wx:for-item="df" wx:key="field_name">
+                <text class="fc-dept__field-label">{{df.label}}</text>
+                <t-input wx:if="{{df.type === 'input' || df.type === 'text'}}" value="{{dept[df.field_name]}}" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" placeholder="{{df.placeholder || '-'}}" borderless style="padding:0;font-size:26rpx;" bind:change="onDeptFieldChange" />
+                <t-input wx:elif="{{df.type === 'number'}}" value="{{dept[df.field_name]}}" type="number" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" placeholder="0" borderless style="padding:0;font-size:26rpx;" bind:change="onDeptNumberChange" />
+                <view wx:elif="{{df.type === 'select'}}" class="fc-dept__select" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" data-options="{{df.options}}" bindtap="openSearchSelect">
+                  <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || df.placeholder || '请选择'}}</text>
+                  <t-icon name="chevron-down" size="28rpx" />
+                </view>
+                <view wx:elif="{{df.type === 'datetime' && df.auto_now !== false}}" class="fc-dept__time" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" bindtap="fillDeptTime">
+                  <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '点击记录'}}</text>
+                </view>
+                <view wx:elif="{{df.type === 'datetime' && df.auto_now === false}}" class="fc-dept__time" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" bindtap="openDatePicker">
+                  <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '选择时间'}}</text>
+                </view>
+                <t-textarea wx:elif="{{df.type === 'textarea'}}" value="{{dept[df.field_name]}}" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" placeholder="{{df.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:24rpx;" bind:change="onDeptFieldChange" />
+              </view>
+            </view>
+          </view>
         </view>
       </view>
-
     </view>
-  </view>
+  </block>
 
-  <!-- 3. 入库签字 -->
+  <!-- 入库签字 -->
   <view class="fc-signature">
     <view class="fc-signature__title">入库签字</view>
     <view class="fc-signature__row">
@@ -140,6 +202,10 @@
         <text class="fc-signature__label">入库日期</text>
         <t-input value="{{warehouseDate}}" placeholder="日期" borderless style="padding:0;font-size:28rpx;flex:1;" bind:change="onWarehouseDateChange" />
       </view>
+    </view>
+    <view class="fc-qc-gate-hint" wx:if="{{match && !match.all_qc_complete}}">
+      <t-icon name="error-circle" size="28rpx" style="color:#e34d59;" />
+      <text>入库前需完成全部工序的品质检验</text>
     </view>
   </view>
 

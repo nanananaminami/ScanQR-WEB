@@ -74,6 +74,8 @@ Page({
           projectLabel: this.getProjectLabel(c),
           workOrderNo: c.work_order_no || '',
           stepCount: (c.dynamic_steps || c.steps || []).length || 0,
+          currentStep: c.current_step || this.getCurrentStep(c),
+          stepProgress: this.getStepProgress(c),
           lockedText: c.is_locked ? '锁定中' : '空闲',
           lockTimeText: c.lock_time ? this.formatTime(c.lock_time) : '-',
           statusTheme: c.status === '已完工' ? 'success' : (c.status === '已作废' ? 'danger' : 'primary')
@@ -90,6 +92,25 @@ Page({
     const hd = card.header_data || {};
     const projectName = card.project_name || hd.project_name || '';
     return projectName || card.order_no || '';
+  },
+
+  getCurrentStep(card) {
+    const steps = card.dynamic_steps || card.steps || [];
+    if (steps.length === 0) return '-';
+    const idx = card.current_step_index;
+    if (idx !== undefined && steps[idx]) return steps[idx].step_name;
+    for (let i = 0; i < steps.length; i++) {
+      if (!steps[i].prod_completed_at) return steps[i].step_name;
+    }
+    return steps[steps.length - 1].step_name;
+  },
+
+  getStepProgress(card) {
+    const steps = card.dynamic_steps || card.steps || [];
+    if (steps.length === 0) return '';
+    const prodDone = steps.filter(s => s.prod_completed_at).length;
+    const qcDone = steps.filter(s => s.qc_completed_at).length;
+    return prodDone + '/' + qcDone + '/' + steps.length;
   },
 
   buildHeaderForm(headerFields, existing) {

@@ -42,7 +42,7 @@ async function isAdminRole(role_id) {
 }
 
 exports.main = async (event, context) => {
-  const { user_id, real_name, department, role_id, phone, status } = event;
+  const { user_id, real_name, department, role_id, phone, status, workstation } = event;
   try {
     const auth = await authenticate(event);
     if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -64,6 +64,9 @@ exports.main = async (event, context) => {
     if (real_name !== undefined) updateData.real_name = real_name;
     if (department !== undefined) updateData.department = department;
     if (phone !== undefined) updateData.phone = phone;
+    if (workstation !== undefined) {
+      updateData.workstation = Array.isArray(workstation) ? workstation.filter(s => s) : (workstation ? [workstation] : []);
+    }
     if (role_id !== undefined && role_id !== target.role_id) {
       const roleRes = await db.collection('sys_roles').where({ role_id }).get();
       if (roleRes.data.length === 0) {

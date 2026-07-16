@@ -56,6 +56,7 @@ exports.main = async (event, context) => {
       phone: u.phone || '',
       role_id: u.role_id,
       role_name: (roleMap[u.role_id] && roleMap[u.role_id].role_name) || u.role_id,
+      workstation: u.workstation || [],
       status: u.status,
       created_at: u.created_at,
       last_login: u.last_login

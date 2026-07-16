@@ -49,6 +49,7 @@ Page({
   },
 
   initDisplay(card, template) {
+    const steps = card.dynamic_steps || card.steps || [];
     this.setData({
       loading: false,
       card,
@@ -56,10 +57,44 @@ Page({
       headerFields: (template && template.header_fields) || [],
       headerData: card.header_data || {},
       detailFields: (template && template.detail_fields) || [],
-      dynamicSteps: card.dynamic_steps || card.steps || [],
+      dynamicSteps: steps,
       warehousePersonnel: card.warehouse_personnel || '',
       warehouseDate: card.warehouse_date || ''
     });
+  },
+
+  getSlaText(prevStep, currentStep) {
+    if (!prevStep || !prevStep.prod_completed_at || !currentStep || !currentStep.prod_started_at) return null;
+    const prevTime = new Date(prevStep.prod_completed_at);
+    const startTime = new Date(currentStep.prod_started_at);
+    const minutes = Math.floor((startTime.getTime() - prevTime.getTime()) / 60000);
+    if (minutes <= 0) return null;
+    if (minutes >= 1440) {
+      const d = Math.floor(minutes / 1440);
+      const h = Math.floor((minutes % 1440) / 60);
+      return d + '天' + (h > 0 ? h + '小时' : '');
+    }
+    if (minutes >= 60) {
+      return Math.floor(minutes / 60) + '小时' + (minutes % 60) + '分';
+    }
+    return minutes + '分钟';
+  },
+
+  formatTime(t) {
+    if (!t) return '-';
+    const d = new Date(t);
+    if (isNaN(d.getTime())) return '-';
+    const pad = (n) => (n < 10 ? '0' + n : '' + n);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  },
+
+  getStepStatusText(s) {
+    const parts = [];
+    if (s.prod_completed_at) parts.push('生产已完成(' + (s.prod_completed_by || '-') + ')');
+    else if (s.prod_started_at) parts.push('生产中');
+    else parts.push('未开始');
+    if (s.qc_completed_at) parts.push('品质已完成');
+    return parts.join(' · ');
   },
 
   viewQrCode() {
@@ -80,7 +115,8 @@ Page({
         getApp().globalData.lockedCard = {
           cardData: result.cardData,
           templateData: result.templateData,
-          operator: operatorName
+          operator: operatorName,
+          match: result.match || null
         };
         wx.navigateTo({ url: '/pages/flow-card/flow-card?order_no=' + encodeURIComponent(this.data.orderNo) });
       } else {

@@ -35,6 +35,13 @@ async function authenticate(event) {
   return { ok: true, user, role, role_id: user.role_id, permissions, session };
 }
 
+function calcSlaMinutes(prevCompletedAt) {
+  if (!prevCompletedAt) return null;
+  const prev = new Date(prevCompletedAt);
+  const now = new Date();
+  return Math.floor((now.getTime() - prev.getTime()) / 60000);
+}
+
 exports.main = async (event, context) => {
   const { order_no, user_name } = event;
   try {
@@ -50,6 +57,10 @@ exports.main = async (event, context) => {
 
     const operator = user_name || auth.user.real_name || auth.user.username || '未知操作员';
     const operatorUserId = auth.user._id;
+    const rawWs = auth.user.workstation;
+    const operatorWorkstations = Array.isArray(rawWs)
+      ? rawWs.filter(s => s)
+      : (rawWs && typeof rawWs === 'string' ? [rawWs.trim()] : []);
     const now = new Date();
 
     let lockRes = await db.collection('process_cards').where({
@@ -91,6 +102,105 @@ exports.main = async (event, context) => {
     const cardRes = await db.collection('process_cards').where({ order_no }).get();
     const cardData = cardRes.data[0];
 
+    const stepsField = cardData.dynamic_steps ? 'dynamic_steps' : 'steps';
+
+    let steps = cardData[stepsField] || [];
+    if (steps.length > 0 && steps[0].depts && steps[0].depts.length) {
+      // dynamic_steps format: already in new format
+    } else {
+      // Legacy flat steps format — normalize to new format with a depts wrapper
+      steps = steps.map(s => ({
+        step_name: s.step_name,
+        sort: s.sort,
+        device_no: s.device_no || '',
+        fixture_no: s.fixture_no || '',
+        prod_started_at: s.prod_started_at || null,
+        prod_completed_at: s.prod_completed_at || null,
+        prod_completed_by: s.prod_completed_by || null,
+        qc_completed_at: s.qc_completed_at || null,
+        qc_completed_by: s.qc_completed_by || null,
+        depts: s.depts || [
+          { dept_name: '生产' },
+          { dept_name: '品质' }
+        ]
+      }));
+    }
+    cardData.dynamic_steps = steps;
+
+    let match = null;
+
+    if (operatorWorkstations.length > 0) {
+      const matchedList = [];
+      const nowStr = now.toISOString();
+
+      for (const ws of operatorWorkstations) {
+        const idx = steps.findIndex(s => s.step_name === ws);
+        if (idx === -1) continue;
+
+        const currentStep = steps[idx];
+
+        const gated = idx > 0 && !steps[idx - 1].prod_completed_at;
+
+        if (!currentStep.prod_started_at) {
+          await db.collection('process_cards').doc(cardData._id).update({
+            data: {
+              [stepsField + '.' + idx + '.prod_started_at']: nowStr,
+              last_updated: db.serverDate()
+            }
+          }).catch(() => {});
+          currentStep.prod_started_at = nowStr;
+        }
+
+        let slaMinutes = null;
+        let slaText = null;
+        if (idx > 0 && steps[idx - 1].prod_completed_at) {
+          slaMinutes = calcSlaMinutes(steps[idx - 1].prod_completed_at);
+          slaText = slaMinutes !== null
+            ? (slaMinutes >= 1440 ? Math.floor(slaMinutes / 1440) + '天' + (slaMinutes % 1440 >= 60 ? Math.floor((slaMinutes % 1440) / 60) + '小时' : '') : (slaMinutes >= 60 ? Math.floor(slaMinutes / 60) + '小时' + (slaMinutes % 60) + '分' : slaMinutes + '分钟'))
+            : null;
+        }
+
+        matchedList.push({
+          step_index: idx,
+          step_name: ws,
+          step: currentStep,
+          sla_minutes: slaMinutes,
+          sla_text: slaText,
+          gated: gated
+        });
+      }
+
+      if (matchedList.length === 0) {
+        return {
+          success: false, code: 'NO_MATCH_STEP',
+          msg: '该工单没有' + operatorWorkstations.join('、') + '工段，请联系管理员'
+        };
+      }
+
+      const firstIdx = matchedList[0].step_index;
+      cardData.current_step = matchedList.map(m => m.step_name).join('、');
+      cardData.current_step_index = firstIdx;
+
+      const missingQC = steps.slice(0, firstIdx).filter(s => !s.qc_completed_at);
+      const allQCComplete = steps.every(s => s.qc_completed_at);
+
+      match = {
+        matched_steps: matchedList,
+        missing_qc_steps: missingQC.map(s => s.step_name),
+        quality_gate_ok: missingQC.length === 0,
+        all_qc_complete: allQCComplete,
+        all_steps_summary: steps.map(s => ({
+          step_name: s.step_name,
+          sort: s.sort,
+          prod_started_at: s.prod_started_at || null,
+          prod_completed_at: s.prod_completed_at || null,
+          prod_completed_by: s.prod_completed_by || null,
+          qc_completed_at: s.qc_completed_at || null,
+          qc_completed_by: s.qc_completed_by || null
+        }))
+      };
+    }
+
     let templateData = null;
     if (cardData.template_id) {
       try {
@@ -129,7 +239,8 @@ exports.main = async (event, context) => {
       code: 'OK',
       cardData: cardData,
       templateData: templateData,
-      operator: operator
+      operator: operator,
+      match: match
     };
   } catch (err) {
     return { success: false, code: 'ERROR', msg: '系统异常', error: err };

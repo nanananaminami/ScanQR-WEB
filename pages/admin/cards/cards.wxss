@@ -99,6 +99,16 @@
   font-weight: 500;
 }
 
+.card-item__value--progress {
+  color: #0052D9;
+  font-weight: 600;
+}
+
+.card-item__value--step {
+  color: #e37318;
+  font-weight: 600;
+}
+
 .card-item__action {
   display: flex;
   justify-content: flex-end;

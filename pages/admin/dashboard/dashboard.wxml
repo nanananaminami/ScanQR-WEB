@@ -35,6 +35,36 @@
       <text class="total-bar__num">{{stats.totalLogs}}</text>
     </view>
 
+    <!-- WIP 在制品按工段分布 -->
+    <view class="db-section" wx:if="{{stats.wipByWorkstation.length > 0}}">
+      <view class="db-section__title">在制品分布（WIP）</view>
+      <view class="wip-grid">
+        <view class="wip-item" wx:for="{{stats.wipByWorkstation}}" wx:key="workstation">
+          <view class="wip-item__name">{{item.workstation}}</view>
+          <view class="wip-item__count">{{item.wip_count}}</view>
+          <view class="wip-item__label">件</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- SLA 呆滞瓶颈 -->
+    <view class="db-section" wx:if="{{stats.slaBottlenecks.length > 0}}">
+      <view class="db-section__title">流转瓶颈（久等未开工）</view>
+      <view class="sla-list">
+        <view class="sla-item" wx:for="{{stats.slaBottlenecks}}" wx:key="order_no">
+          <view class="sla-item__header">
+            <text class="sla-item__card">{{item.order_no}}</text>
+            <text class="sla-item__wait">{{item.wait_text}}</text>
+          </view>
+          <view class="sla-item__path">
+            <text>{{item.from_step}}</text>
+            <t-icon name="arrow-right" size="24rpx" style="margin:0 8rpx;color:#909399;" />
+            <text>{{item.to_step}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <view class="quick-actions">
       <view class="quick-action" bindtap="goScan">
         <t-icon name="scan" size="48rpx" />

@@ -104,3 +104,13 @@ getApp().globalData = {
 - 支持分包加载，TDesign 示例页按组件分包
 - 自定义 TabBar 在 `custom-tab-bar/` 中实现
 - 深色模式变量定义在 `theme.json`，通过 `@navTxtStyle` 等 CSS 变量引用
+
+## Agent skills
+
+### Issue tracker
+
+Issues live on GitHub Issues for nanananaminami/ScanQR-WEB. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context repo — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
