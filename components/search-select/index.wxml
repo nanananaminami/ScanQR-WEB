@@ -1,0 +1,27 @@
+<view class="search-mask" wx:if="{{visible}}" bindtap="onClose"></view>
+<view class="search-panel" wx:if="{{visible}}">
+  <view class="search-panel__header">
+    <text class="search-panel__title">选择 {{label}}</text>
+    <view class="search-panel__close" catchtap="onClose">
+      <t-icon name="close" size="40rpx" />
+    </view>
+  </view>
+  <view class="search-panel__search">
+    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
+    <input class="search-panel__input" value="{{keyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onSearchChange" />
+    <text class="search-panel__clear" wx:if="{{keyword}}" catchtap="clearSearch">清除</text>
+  </view>
+  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="search-panel__item {{currentValue === item ? 'search-panel__item--selected' : ''}}"
+          wx:for="{{filteredOptions}}" wx:key="*this"
+          data-value="{{item}}" bindtap="onSelect">
+      <text>{{item}}</text>
+      <t-icon wx:if="{{currentValue === item}}" name="check" size="32rpx" style="color:#0052D9;" />
+    </view>
+    <view class="search-panel__empty" wx:if="{{filteredOptions.length === 0}}">
+      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
+      <text wx:if="{{options.length === 0}}">该字段无配置选项</text>
+      <text wx:else>未找到匹配 "{{keyword}}"</text>
+    </view>
+  </scroll-view>
+</view>

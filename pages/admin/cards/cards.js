@@ -1,5 +1,5 @@
 const auth = require('../../../utils/auth');
-const db = wx.cloud.database();
+const { pad, nowStr, formatShortTime } = require('../../../utils/time');
 
 const STATUS_TABS = ['加工中', '已完工', '已作废'];
 
@@ -32,10 +32,11 @@ Page({
     searchSelectValue: '',
     searchKeyword: '',
     filteredOptions: [],
-    datePickerVisible: false,
-    datePickerValue: '',
-    datePickerField: '',
-    creating: false
+    creating: false,
+    // 导出
+    showExport: false,
+    exportFilter: { status: '', keyword: '', dateFrom: '', dateTo: '' },
+    exporting: false
   },
 
   onLoad() {
@@ -63,12 +64,15 @@ Page({
 
   loadCards() {
     this.setData({ loading: true });
-    db.collection('process_cards')
-      .where({ status: this.data.statusFilter })
-      .orderBy('created_at', 'desc')
-      .get()
+    auth.callWithAuth('getCardList', { status: this.data.statusFilter })
       .then((res) => {
-        const cards = res.data.map((c) => ({
+        const result = res.result || {};
+        if (!result.success) {
+          this.setData({ loading: false });
+          wx.showToast({ title: result.msg || '加载失败', icon: 'none' });
+          return;
+        }
+        const cards = (result.cards || []).map((c) => ({
           ...c,
           orderNo: c.order_no || c.card_no || '',
           projectLabel: this.getProjectLabel(c),
@@ -77,7 +81,7 @@ Page({
           currentStep: c.current_step || this.getCurrentStep(c),
           stepProgress: this.getStepProgress(c),
           lockedText: c.is_locked ? '锁定中' : '空闲',
-          lockTimeText: c.lock_time ? this.formatTime(c.lock_time) : '-',
+          lockTimeText: c.lock_time ? formatShortTime(c.lock_time) : '-',
           statusTheme: c.status === '已完工' ? 'success' : (c.status === '已作废' ? 'danger' : 'primary')
         }));
         this.setData({ cards, loading: false });
@@ -108,7 +112,7 @@ Page({
   getStepProgress(card) {
     const steps = card.dynamic_steps || card.steps || [];
     if (steps.length === 0) return '';
-    const prodDone = steps.filter(s => s.prod_completed_at).length;
+    const prodDone = steps.filter(s => s.prod_completed_at || s.step_type === 'qc').length;
     const qcDone = steps.filter(s => s.qc_completed_at).length;
     return prodDone + '/' + qcDone + '/' + steps.length;
   },
@@ -129,12 +133,7 @@ Page({
     return form;
   },
 
-  formatTime(t) {
-    if (!t) return '-';
-    const d = new Date(t);
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    return d.getMonth() + 1 + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-  },
+
 
   onStatusTabChange(e) {
     this.setData({ statusFilter: e.currentTarget.dataset.status });
@@ -298,22 +297,8 @@ Page({
     this.setData({ showSearchSelect: false });
   },
 
-  // 模糊过滤：忽略大小写、子串匹配
-  onSearchKeywordChange(e) {
-    const keyword = (e.detail.value || '').toLowerCase().trim();
-    const options = this.data.searchSelectOptions;
-    const filtered = keyword
-      ? options.filter(o => String(o).toLowerCase().indexOf(keyword) !== -1)
-      : options;
-    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
-  },
-
-  clearSearchKeyword() {
-    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
-  },
-
-  selectSearchOption(e) {
-    const value = e.currentTarget.dataset.value;
+  onSearchSelect(e) {
+    const value = e.detail.value;
     const field = this.data.searchSelectField;
     this.setData({
       ['headerForm.' + field]: value,
@@ -323,33 +308,22 @@ Page({
 
   fillHeaderTime(e) {
     const field = e.currentTarget.dataset.field;
-    const now = new Date();
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    const timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-    this.setData({ ['headerForm.' + field]: timeStr });
+    this.setData({ ['headerForm.' + field]: nowStr() });
     wx.showToast({ title: '已记录时间', icon: 'success', duration: 1000 });
   },
 
-  openDatePicker(e) {
+  onHeaderDatePick(e) {
     const field = e.currentTarget.dataset.field;
-    this.setData({
-      datePickerVisible: true,
-      datePickerValue: this.data.headerForm[field] || '',
-      datePickerField: field
-    });
-  },
-
-  onDatePickerConfirm(e) {
-    const field = this.data.datePickerField;
-    this.setData({
-      ['headerForm.' + field]: e.detail.value,
-      datePickerVisible: false,
-      datePickerField: ''
-    });
-  },
-
-  onDatePickerCancel() {
-    this.setData({ datePickerVisible: false, datePickerField: '' });
+    const date = e.detail.value;
+    const tpl = this.data.selectedTemplate;
+    const hf = tpl && (tpl.header_fields || []).find(x => x.field_name === field);
+    if (hf && hf.type === 'date') {
+      this.setData({ ['headerForm.' + field]: date });
+    } else {
+      const now = new Date();
+      const timeStr = ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+      this.setData({ ['headerForm.' + field]: date + timeStr });
+    }
   },
 
   submitCreate() {
@@ -534,5 +508,81 @@ Page({
   onPullDownRefresh() {
     this.loadCards();
     wx.stopPullDownRefresh();
+  },
+
+  openExport() {
+    this.setData({ showExport: true });
+  },
+
+  closeExport() {
+    this.setData({ showExport: false });
+  },
+
+  onExportFilterStatus(e) {
+    const status = e.currentTarget.dataset.status;
+    this.setData({ 'exportFilter.status': status });
+  },
+
+  onExportFilterChange(e) {
+    const field = e.currentTarget.dataset.field;
+    this.setData({ ['exportFilter.' + field]: e.detail.value });
+  },
+
+  onExportDateFrom(e) {
+    this.setData({ 'exportFilter.dateFrom': e.detail.value });
+  },
+
+  onExportDateTo(e) {
+    this.setData({ 'exportFilter.dateTo': e.detail.value });
+  },
+
+  doExport() {
+    if (this.data.exporting) return;
+    this.setData({ exporting: true });
+    wx.showLoading({ title: '导出中...' });
+
+    const { status, keyword, dateFrom, dateTo } = this.data.exportFilter;
+    auth.callWithAuth('exportCards', {
+      status: status || undefined,
+      keyword: keyword || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined
+    }).then((res) => {
+      wx.hideLoading();
+      this.setData({ exporting: false, showExport: false });
+      const result = res.result || {};
+      if (result.success && result.downloadUrl) {
+        const url = result.downloadUrl;
+        wx.setClipboardData({ data: url });
+        wx.showModal({
+          title: '导出成功',
+          content: '共导出 ' + result.total + ' 条记录。链接已复制到剪贴板。',
+          confirmText: '打开文件',
+          cancelText: '关闭',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              wx.downloadFile({
+                url: url,
+                success: (dfRes) => {
+                  wx.openDocument({
+                    filePath: dfRes.tempFilePath,
+                    fileType: 'csv',
+                    showMenu: true,
+                    fail: () => wx.showToast({ title: '请用 WPS 等应用打开', icon: 'none' })
+                  });
+                },
+                fail: () => wx.showToast({ title: '下载失败', icon: 'none' })
+              });
+            }
+          }
+        });
+      } else {
+        wx.showToast({ title: result.msg || '导出失败', icon: 'none' });
+      }
+    }).catch(() => {
+      wx.hideLoading();
+      this.setData({ exporting: false });
+      wx.showToast({ title: '导出失败', icon: 'none' });
+    });
   }
 });

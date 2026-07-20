@@ -5,35 +5,8 @@ const _ = db.command;
 
 const LOCK_TIMEOUT_MS = 30 * 60 * 1000;
 
-async function authenticate(event) {
-  const token = event.session_token;
-  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
-  const sessionRes = await db.collection('sys_sessions').where({
-    session_token: token,
-    expires_at: _.gt(new Date())
-  }).get();
-  if (sessionRes.data.length === 0) {
-    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
-  }
-  const session = sessionRes.data[0];
-  let user = null;
-  try {
-    const userRes = await db.collection('sys_users').doc(session.user_id).get();
-    user = userRes.data;
-  } catch (e) {
-    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
-  }
-  if (!user || user.status === 'disabled') {
-    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
-  }
-  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
-  const role = roleRes.data[0] || null;
-  const permissions = (role && role.permissions) || [];
-  db.collection('sys_sessions').doc(session._id).update({
-    data: { last_active: db.serverDate() }
-  }).catch(() => {});
-  return { ok: true, user, role, role_id: user.role_id, permissions, session };
-}
+const common = require('./common');
+const authenticate = common.makeAuth(db, _);
 
 function calcSlaMinutes(prevCompletedAt) {
   if (!prevCompletedAt) return null;
@@ -43,6 +16,7 @@ function calcSlaMinutes(prevCompletedAt) {
 }
 
 exports.main = async (event, context) => {
+  event = common.unwrapHttpEvent(event);
   const { order_no, user_name } = event;
   try {
     const auth = await authenticate(event);
@@ -112,6 +86,7 @@ exports.main = async (event, context) => {
       steps = steps.map(s => ({
         step_name: s.step_name,
         sort: s.sort,
+        step_type: s.step_type || 'prod',
         device_no: s.device_no || '',
         fixture_no: s.fixture_no || '',
         prod_started_at: s.prod_started_at || null,
@@ -138,10 +113,11 @@ exports.main = async (event, context) => {
         if (idx === -1) continue;
 
         const currentStep = steps[idx];
+        const isQcOnly = currentStep.step_type === 'qc';
 
-        const gated = idx > 0 && !steps[idx - 1].prod_completed_at;
+        const gated = !isQcOnly && idx > 0 && !steps[idx - 1].prod_completed_at;
 
-        if (!currentStep.prod_started_at) {
+        if (!isQcOnly && !currentStep.prod_started_at) {
           await db.collection('process_cards').doc(cardData._id).update({
             data: {
               [stepsField + '.' + idx + '.prod_started_at']: nowStr,
@@ -153,11 +129,9 @@ exports.main = async (event, context) => {
 
         let slaMinutes = null;
         let slaText = null;
-        if (idx > 0 && steps[idx - 1].prod_completed_at) {
+        if (!isQcOnly && idx > 0 && steps[idx - 1].prod_completed_at) {
           slaMinutes = calcSlaMinutes(steps[idx - 1].prod_completed_at);
-          slaText = slaMinutes !== null
-            ? (slaMinutes >= 1440 ? Math.floor(slaMinutes / 1440) + '天' + (slaMinutes % 1440 >= 60 ? Math.floor((slaMinutes % 1440) / 60) + '小时' : '') : (slaMinutes >= 60 ? Math.floor(slaMinutes / 60) + '小时' + (slaMinutes % 60) + '分' : slaMinutes + '分钟'))
-            : null;
+          slaText = slaMinutes !== null ? common.formatWaitTime(slaMinutes) : null;
         }
 
         matchedList.push({
@@ -166,7 +140,8 @@ exports.main = async (event, context) => {
           step: currentStep,
           sla_minutes: slaMinutes,
           sla_text: slaText,
-          gated: gated
+          gated: gated,
+          qc_only: isQcOnly
         });
       }
 
@@ -192,6 +167,7 @@ exports.main = async (event, context) => {
         all_steps_summary: steps.map(s => ({
           step_name: s.step_name,
           sort: s.sort,
+          step_type: s.step_type || 'prod',
           prod_started_at: s.prod_started_at || null,
           prod_completed_at: s.prod_completed_at || null,
           prod_completed_by: s.prod_completed_by || null,

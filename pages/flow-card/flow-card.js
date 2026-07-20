@@ -1,4 +1,5 @@
 const auth = require('../../utils/auth');
+const { pad, nowStr } = require('../../utils/time');
 
 function cloneSteps(steps) {
   if (!Array.isArray(steps)) return [];
@@ -63,12 +64,6 @@ function convertLegacySteps(steps, detailFields) {
   });
 }
 
-function nowStr() {
-  const now = new Date();
-  const pad = (n) => (n < 10 ? '0' + n : '' + n);
-  return now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-}
-
 Page({
   data: {
     loading: true,
@@ -103,6 +98,7 @@ Page({
   },
 
   onLoad(options) {
+    if (!auth.requireLogin()) return;
     const orderNo = options.order_no ? decodeURIComponent(options.order_no) : '';
     const locked = getApp().globalData.lockedCard;
     this.setData({ orderNo });
@@ -131,15 +127,20 @@ Page({
     if (match && match.matched_steps && match.matched_steps.length > 0) {
       matchedStepsData = match.matched_steps.map(ms => {
         const step = dynamicSteps[ms.step_index];
+        const prodCompleted = ms.step.prod_completed_at ? true : false;
+        const qcCompleted = ms.step.qc_completed_at ? true : false;
+        const deptTab = ms.qc_only ? '品质' : '生产';
         return {
           step_index: ms.step_index,
           step_name: ms.step_name,
           step: step,
           sla_text: ms.sla_text || null,
           gated: ms.gated,
-          deptTab: '品质',
-          prodCompleted: ms.step.prod_completed_at ? true : false,
-          qcCompleted: ms.step.qc_completed_at ? true : false
+          qc_only: ms.qc_only || false,
+          deptTab: deptTab,
+          isReadonly: (deptTab === '生产' && prodCompleted) || (deptTab === '品质' && qcCompleted),
+          prodCompleted: prodCompleted,
+          qcCompleted: qcCompleted
         };
       });
     } else if (match && match.matched_step) {
@@ -182,27 +183,9 @@ Page({
   },
 
   refetchCard(orderNo) {
-    wx.cloud.database().collection('process_cards').where({ order_no: orderNo }).get()
-      .then((res) => {
-        if (res.data.length > 0) {
-          const card = res.data[0];
-          this.setData({
-            loading: false,
-            cardData: card,
-            orderNo: card.order_no || '',
-            dynamicSteps: cloneSteps(card.dynamic_steps || []),
-            headerData: cloneObj(card.header_data || {}),
-            warehousePersonnel: card.warehouse_personnel || '',
-            warehouseDate: card.warehouse_date || ''
-          });
-          wx.showToast({ title: '数据已过期，请重新扫码上锁', icon: 'none' });
-        } else {
-          this.setData({ loading: false });
-        }
-      })
-      .catch(() => {
-        this.setData({ loading: false });
-      });
+    this.setData({ loading: false });
+    wx.showToast({ title: '数据已过期，请重新扫码上锁', icon: 'none', duration: 2000 });
+    setTimeout(() => wx.switchTab({ url: '/pages/scan/scan' }), 2000);
   },
 
   switchDeptTab(e) {
@@ -211,6 +194,7 @@ Page({
     const data = this.data.matchedStepsData.slice();
     if (data[idx]) {
       data[idx].deptTab = tab;
+      data[idx].isReadonly = (tab === '生产' && data[idx].prodCompleted) || (tab === '品质' && data[idx].qcCompleted);
       this.setData({ matchedStepsData: data });
     }
   },
@@ -250,32 +234,14 @@ Page({
     this.setData({ showSearchSelect: false });
   },
 
-  onSearchKeywordChange(e) {
-    const keyword = (e.detail.value || '').toLowerCase().trim();
-    const opts = this.data.searchSelectOptions;
-    const filtered = keyword
-      ? opts.filter(o => String(o).toLowerCase().indexOf(keyword) !== -1)
-      : opts;
-    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
-  },
-
-  clearSearchKeyword() {
-    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
-  },
-
-  selectSearchOption(e) {
-    const value = e.currentTarget.dataset.value;
+  onSearchSelect(e) {
+    const value = e.detail.value;
     const { searchSelectField, searchSelectMainIndex, searchSelectSubIndex } = this.data;
     if (searchSelectMainIndex !== -1 && searchSelectSubIndex !== -1) {
-      this.setData({
-        ['dynamicSteps[' + searchSelectMainIndex + '].depts[' + searchSelectSubIndex + '].' + searchSelectField]: value,
-        showSearchSelect: false
-      });
+      const key = 'dynamicSteps[' + searchSelectMainIndex + '].depts[' + searchSelectSubIndex + '].' + searchSelectField;
+      this.setData({ [key]: value, showSearchSelect: false });
     } else {
-      this.setData({
-        ['headerData.' + searchSelectField]: value,
-        showSearchSelect: false
-      });
+      this.setData({ ['headerData.' + searchSelectField]: value, showSearchSelect: false });
     }
   },
 
@@ -301,43 +267,31 @@ Page({
     wx.showToast({ title: '已记录时间', icon: 'success', duration: 1000 });
   },
 
-  openDatePicker(e) {
-    const { field, mainindex, subindex } = e.currentTarget.dataset;
-    let currentValue = '';
-    if (mainindex !== undefined && subindex !== undefined) {
-      const dept = (this.data.dynamicSteps[mainindex] || {}).depts || [];
-      currentValue = (dept[subindex] || {})[field] || '';
+  onHeaderDatePick(e) {
+    const field = e.currentTarget.dataset.field;
+    const date = e.detail.value;
+    const hf = this.data.headerFields.find(x => x.field_name === field);
+    const isDateOnly = hf && hf.type === 'date';
+    if (isDateOnly) {
+      this.setData({ ['headerData.' + field]: date });
     } else {
-      currentValue = this.data.headerData[field] || '';
-    }
-    this.setData({
-      datePickerVisible: true,
-      datePickerValue: currentValue,
-      datePickerTarget: { field, mainIndex: mainindex, subIndex: subindex }
-    });
-  },
-
-  onDatePickerConfirm(e) {
-    const target = this.data.datePickerTarget;
-    if (!target) return;
-    const value = e.detail.value;
-    if (target.mainIndex !== undefined && target.subIndex !== undefined) {
-      this.setData({
-        ['dynamicSteps[' + target.mainIndex + '].depts[' + target.subIndex + '].' + target.field]: value,
-        datePickerVisible: false,
-        datePickerTarget: null
-      });
-    } else {
-      this.setData({
-        ['headerData.' + target.field]: value,
-        datePickerVisible: false,
-        datePickerTarget: null
-      });
+      const now = new Date();
+      const timeStr = ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+      this.setData({ ['headerData.' + field]: date + timeStr });
     }
   },
 
-  onDatePickerCancel() {
-    this.setData({ datePickerVisible: false, datePickerTarget: null });
+  onDeptDatePick(e) {
+    const { mainindex, subindex, field } = e.currentTarget.dataset;
+    const date = e.detail.value;
+    const df = this.data.detailFields.find(x => x.field_name === field);
+    if (df && df.type === 'date') {
+      this.setData({ ['dynamicSteps[' + mainindex + '].depts[' + subindex + '].' + field]: date });
+    } else {
+      const now = new Date();
+      const timeStr = ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+      this.setData({ ['dynamicSteps[' + mainindex + '].depts[' + subindex + '].' + field]: date + timeStr });
+    }
   },
 
   onWarehousePersonnelChange(e) {
@@ -350,13 +304,29 @@ Page({
 
   submitAndUnlock() {
     const { dynamicSteps, cardData, headerData, operatorName, submitting,
-            warehousePersonnel, warehouseDate, matchedStepsData } = this.data;
+            warehousePersonnel, warehouseDate, matchedStepsData, detailFields } = this.data;
     if (submitting) return;
 
     const matchedSteps = matchedStepsData.map(ms => ({
       step_index: ms.step_index,
       dept_type: ms.deptTab
     }));
+
+    for (const ms of matchedStepsData) {
+      const subIndex = ms.deptTab === '生产' ? 0 : 1;
+      const step = dynamicSteps[ms.step_index];
+      if (!step) continue;
+      const dept = (step.depts || [])[subIndex];
+      if (!dept) continue;
+      for (const df of detailFields) {
+        if (!df.required) continue;
+        const val = dept[df.field_name];
+        if (val === undefined || val === null || val === '' || val === 0) {
+          wx.showToast({ title: '请填写「' + ms.step_name + '」的' + df.label, icon: 'none' });
+          return;
+        }
+      }
+    }
 
     const hasGated = matchedStepsData.some(ms => ms.gated && ms.deptTab === '生产');
     if (hasGated) {

@@ -127,6 +127,9 @@
     <view class="te-tip" wx:if="{{item.type === 'datetime' && item.auto_now === false}}">
       工人使用日期时间选择器手动选择
     </view>
+    <view class="te-tip" wx:if="{{item.type === 'date'}}">
+      使用原生日期选择器，不含时间
+    </view>
   </view>
 </template>
 

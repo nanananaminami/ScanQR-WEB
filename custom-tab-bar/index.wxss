@@ -4,10 +4,10 @@
   left: 0;
   right: 0;
   display: flex;
-  background: #ffffff;
+  background: var(--td-bg-color-container, #ffffff);
   height: 100rpx;
   padding-bottom: env(safe-area-inset-bottom);
-  box-shadow: 0 -1rpx 0 rgba(0, 0, 0, 0.06);
+  box-shadow: 0 -1rpx 0 var(--td-component-border, rgba(0, 0, 0, 0.06));
   z-index: 999;
 }
 
@@ -18,11 +18,11 @@
   align-items: center;
   justify-content: center;
   gap: 6rpx;
-  color: #909399;
+  color: var(--td-text-color-secondary, #909399);
 }
 
 .tab-bar__item--active {
-  color: #0052D9;
+  color: var(--td-brand-color, #0052D9);
 }
 
 .tab-bar__text {

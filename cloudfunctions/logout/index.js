@@ -3,6 +3,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
 exports.main = async (event, context) => {
+  event = common.unwrapHttpEvent(event);
   const { session_token } = event;
   if (!session_token) return { success: true };
   try {

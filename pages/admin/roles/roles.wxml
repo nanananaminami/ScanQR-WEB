@@ -9,6 +9,10 @@
     <view class="roles-list-section">
       <view class="section-title">角色列表</view>
       <view class="roles-list">
+        <view class="roles-empty" wx:if="{{roles.length === 0 && !editing}}">
+          <t-icon name="folder-open" size="80rpx" style="color:#c0c4cc;" />
+          <text class="roles-empty__text">暂无角色，点击下方按钮创建</text>
+        </view>
         <view class="role-chip {{currentRole && currentRole.role_id === item.role_id ? 'role-chip--active' : ''}}"
               wx:for="{{roles}}" wx:key="role_id"
               data-index="{{index}}" bindtap="selectRole">

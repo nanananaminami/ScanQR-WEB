@@ -8,6 +8,7 @@
     "t-loading": "tdesign-miniprogram/loading/loading",
     "t-empty": "tdesign-miniprogram/empty/empty",
     "t-tag": "tdesign-miniprogram/tag/tag",
-    "t-date-time-picker": "tdesign-miniprogram/date-time-picker/date-time-picker"
+    "t-date-time-picker": "tdesign-miniprogram/date-time-picker/date-time-picker",
+    "search-select": "/components/search-select/index"
   }
 }

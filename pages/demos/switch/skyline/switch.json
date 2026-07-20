@@ -1,0 +1,13 @@
+{
+  "navigationBarTitleText": "Switch",
+  "usingComponents": {
+    "base": "../base",
+    "label": "../label",
+    "color": "../color",
+    "status": "../status",
+    "size": "../size"
+  },
+  "renderer": "skyline",
+  "componentFramework": "glass-easel",
+  "disableScroll": true
+}

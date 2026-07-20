@@ -1,4 +1,5 @@
 const auth = require('../../utils/auth');
+const { formatDateTime } = require('../../utils/time');
 
 Page({
   data: {
@@ -15,6 +16,7 @@ Page({
   },
 
   onLoad(options) {
+    if (!auth.requireLogin()) return;
     const orderNo = options.order_no ? decodeURIComponent(options.order_no) : '';
     if (!orderNo) {
       this.setData({ loading: false });
@@ -25,23 +27,15 @@ Page({
   },
 
   loadCard(orderNo) {
-    const db = wx.cloud.database();
-    db.collection('process_cards').where({ order_no: orderNo }).get().then((res) => {
-      if (res.data.length === 0) {
+    auth.callWithAuth('getCardDetail', { order_no: orderNo }).then((res) => {
+      const result = res.result || {};
+      if (!result.success || !result.card) {
         this.setData({ loading: false });
-        wx.showToast({ title: '未找到流转卡', icon: 'none' });
+        wx.showToast({ title: result.msg || '未找到流转卡', icon: 'none' });
         return;
       }
-      const card = res.data[0];
-      if (card.template_id) {
-        db.collection('process_templates').where({ template_id: card.template_id }).get().then((tplRes) => {
-          this.initDisplay(card, tplRes.data[0] || null);
-        }).catch(() => {
-          this.initDisplay(card, null);
-        });
-      } else {
-        this.initDisplay(card, null);
-      }
+      const card = result.card;
+      this.initDisplay(card, result.template || null);
     }).catch(() => {
       this.setData({ loading: false });
       wx.showToast({ title: '加载失败', icon: 'none' });
@@ -78,14 +72,6 @@ Page({
       return Math.floor(minutes / 60) + '小时' + (minutes % 60) + '分';
     }
     return minutes + '分钟';
-  },
-
-  formatTime(t) {
-    if (!t) return '-';
-    const d = new Date(t);
-    if (isNaN(d.getTime())) return '-';
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   },
 
   getStepStatusText(s) {

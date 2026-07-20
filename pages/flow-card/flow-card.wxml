@@ -13,11 +13,12 @@
       <text class="fc-progress__curr">{{cardData.current_step || (dynamicSteps[0] && dynamicSteps[0].step_name)}}</text>
     </view>
     <view class="fc-progress__bar">
-      <view class="fc-step-dot {{s.prod_completed_at ? 'fc-step-dot--prod' : ''}} {{s.qc_completed_at ? 'fc-step-dot--qc' : ''}} {{currentStepMap[s.step_name] ? 'fc-step-dot--current' : ''}}"
+      <view class="fc-step-dot {{s.step_type === 'qc' ? 'fc-step-dot--qconly' : ''}} {{s.prod_completed_at || s.step_type === 'qc' ? 'fc-step-dot--prod' : ''}} {{s.qc_completed_at ? 'fc-step-dot--qc' : ''}} {{currentStepMap[s.step_name] ? 'fc-step-dot--current' : ''}}"
             wx:for="{{match.all_steps_summary}}" wx:for-item="s" wx:for-index="si" wx:key="step_name">
         <text class="fc-step-dot__name">{{s.step_name}}</text>
         <view class="fc-step-dot__badges">
-          <text wx:if="{{s.prod_completed_at}}" class="fc-badge fc-badge--prod">产</text>
+          <text wx:if="{{s.step_type === 'qc'}}" class="fc-badge fc-badge--qcskip">QC</text>
+          <text wx:elif="{{s.prod_completed_at}}" class="fc-badge fc-badge--prod">产</text>
           <text wx:if="{{s.qc_completed_at}}" class="fc-badge fc-badge--qc">质</text>
         </view>
       </view>
@@ -54,9 +55,16 @@
         <view wx:elif="{{item.type === 'datetime' && item.auto_now !== false}}" class="fc-time-cell" data-field="{{item.field_name}}" bindtap="fillHeaderTime">
           <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '点击记录'}}</text>
         </view>
-        <view wx:elif="{{item.type === 'datetime' && item.auto_now === false}}" class="fc-time-cell" data-field="{{item.field_name}}" bindtap="openDatePicker">
-          <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '选择时间'}}</text>
-        </view>
+        <picker wx:elif="{{item.type === 'datetime' && item.auto_now === false}}" mode="date" value="{{headerData[item.field_name]}}" bindchange="onHeaderDatePick" data-field="{{item.field_name}}">
+          <view class="fc-time-cell">
+            <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '选择日期'}}</text>
+          </view>
+        </picker>
+        <picker wx:elif="{{item.type === 'date'}}" mode="date" value="{{headerData[item.field_name]}}" bindchange="onHeaderDatePick" data-field="{{item.field_name}}">
+          <view class="fc-time-cell">
+            <text class="{{headerData[item.field_name] ? '' : 'fc-time-cell__placeholder'}}">{{headerData[item.field_name] || '选择日期'}}</text>
+          </view>
+        </picker>
       </view>
       <view class="fc-header__row fc-header__row--full">
         <text class="fc-header__label">锁定人</text>
@@ -94,10 +102,11 @@
 
         <!-- 填报类型切换 -->
         <view class="fc-dept-tabs">
-          <view class="fc-dept-tab {{ms.deptTab === '生产' ? 'fc-dept-tab--active fc-dept-tab--prod' : ''}} {{ms.gated ? 'fc-dept-tab--disabled' : ''}}"
+          <view wx:if="{{!ms.qc_only}}" class="fc-dept-tab {{ms.deptTab === '生产' ? 'fc-dept-tab--active fc-dept-tab--prod' : ''}} {{ms.gated ? 'fc-dept-tab--disabled' : ''}}"
                 data-idx="{{msi}}" data-tab="生产" bindtap="{{ms.gated ? '' : 'switchDeptTab'}}">生产填报</view>
           <view class="fc-dept-tab {{ms.deptTab === '品质' ? 'fc-dept-tab--active fc-dept-tab--qc' : ''}}"
                 data-idx="{{msi}}" data-tab="品质" bindtap="switchDeptTab">品质填报</view>
+          <text wx:if="{{ms.qc_only}}" class="fc-qc-only-badge">纯QC工序</text>
         </view>
 
         <!-- 工序字段 (生产/品质) -->
@@ -109,42 +118,52 @@
             <view class="fc-dept__fields">
               <view class="fc-dept__field {{df.type === 'textarea' || df.type === 'datetime' ? 'fc-dept__field--full' : ''}}"
                     wx:for="{{detailFields}}" wx:for-item="df" wx:key="field_name">
-                <text class="fc-dept__field-label">{{df.label}}</text>
+                <text class="fc-dept__field-label">{{df.label}}{{df.required ? ' *' : ''}}</text>
                 <t-input wx:if="{{df.type === 'input' || df.type === 'text'}}"
-                  value="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  value="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
                   data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
                   placeholder="{{df.placeholder || '-'}}" borderless style="padding:0;font-size:26rpx;"
-                  bind:change="onDeptFieldChange" />
+                  bind:change="onDeptFieldChange" disabled="{{ms.isReadonly}}" />
                 <t-input wx:elif="{{df.type === 'number'}}"
-                  value="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  value="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
                   type="number"
                   data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
                   placeholder="0" borderless style="padding:0;font-size:26rpx;"
-                  bind:change="onDeptNumberChange" />
+                  bind:change="onDeptNumberChange" disabled="{{ms.isReadonly}}" />
                 <view wx:elif="{{df.type === 'select'}}"
-                  class="fc-dept__select"
+                  class="fc-dept__select {{ms.isReadonly ? 'fc-dept__select--readonly' : ''}}"
                   data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}" data-options="{{df.options}}"
-                  bindtap="openSearchSelect">
-                  <text class="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || df.placeholder || '请选择'}}</text>
+                  bindtap="{{ms.isReadonly ? '' : 'openSearchSelect'}}">
+                  <text class="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || df.placeholder || '请选择'}}</text>
                   <t-icon name="chevron-down" size="28rpx" />
                 </view>
                 <view wx:elif="{{df.type === 'datetime' && df.auto_now !== false}}"
-                  class="fc-dept__time"
+                  class="fc-dept__time {{ms.isReadonly ? 'fc-dept__select--readonly' : ''}}"
                   data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
-                  bindtap="fillDeptTime">
-                  <text class="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '点击记录'}}</text>
+                  bindtap="{{ms.isReadonly ? '' : 'fillDeptTime'}}">
+                  <text class="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '点击记录'}}</text>
                 </view>
-                <view wx:elif="{{df.type === 'datetime' && df.auto_now === false}}"
-                  class="fc-dept__time"
-                  data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
-                  bindtap="openDatePicker">
-                  <text class="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '选择时间'}}</text>
-                </view>
+                <picker wx:elif="{{df.type === 'datetime' && df.auto_now === false}}" mode="date"
+                  value="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  bindchange="onDeptDatePick" data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  disabled="{{ms.isReadonly}}">
+                  <view class="fc-dept__time {{ms.isReadonly ? 'fc-dept__select--readonly' : ''}}">
+                    <text class="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '选择日期'}}</text>
+                  </view>
+                </picker>
+                <picker wx:elif="{{df.type === 'date'}}" mode="date"
+                  value="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  bindchange="onDeptDatePick" data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
+                  disabled="{{ms.isReadonly}}">
+                  <view class="fc-dept__time {{ms.isReadonly ? 'fc-dept__select--readonly' : ''}}">
+                    <text class="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name] || '选择日期'}}</text>
+                  </view>
+                </picker>
                 <t-textarea wx:elif="{{df.type === 'textarea'}}"
-                  value="{{ms.step.depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
+                  value="{{dynamicSteps[ms.step_index].depts[ms.deptTab === '生产' ? 0 : 1][df.field_name]}}"
                   data-mainindex="{{ms.step_index}}" data-subindex="{{ms.deptTab === '生产' ? 0 : 1}}" data-field="{{df.field_name}}"
                   placeholder="{{df.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:24rpx;"
-                  bind:change="onDeptFieldChange" />
+                  bind:change="onDeptFieldChange" disabled="{{ms.isReadonly}}" />
               </view>
             </view>
           </view>
@@ -178,9 +197,20 @@
                 <view wx:elif="{{df.type === 'datetime' && df.auto_now !== false}}" class="fc-dept__time" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" bindtap="fillDeptTime">
                   <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '点击记录'}}</text>
                 </view>
-                <view wx:elif="{{df.type === 'datetime' && df.auto_now === false}}" class="fc-dept__time" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" bindtap="openDatePicker">
-                  <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '选择时间'}}</text>
-                </view>
+                <picker wx:elif="{{df.type === 'datetime' && df.auto_now === false}}" mode="date"
+                  value="{{dept[df.field_name]}}" bindchange="onDeptDatePick"
+                  data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}">
+                  <view class="fc-dept__time">
+                    <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '选择日期'}}</text>
+                  </view>
+                </picker>
+                <picker wx:elif="{{df.type === 'date'}}" mode="date"
+                  value="{{dept[df.field_name]}}" bindchange="onDeptDatePick"
+                  data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}">
+                  <view class="fc-dept__time">
+                    <text class="{{dept[df.field_name] ? '' : 'fc-dept__select--ph'}}">{{dept[df.field_name] || '选择日期'}}</text>
+                  </view>
+                </picker>
                 <t-textarea wx:elif="{{df.type === 'textarea'}}" value="{{dept[df.field_name]}}" data-mainindex="{{mainIndex}}" data-subindex="{{subIndex}}" data-field="{{df.field_name}}" placeholder="{{df.placeholder || '-'}}" autosize="{{true}}" borderless style="padding:0;font-size:24rpx;" bind:change="onDeptFieldChange" />
               </view>
             </view>
@@ -220,40 +250,11 @@
   <t-button theme="primary" bind:tap="goScan">去扫码</t-button>
 </view>
 
-<!-- 搜索选择弹层 -->
-<view class="search-mask" wx:if="{{showSearchSelect}}" bindtap="closeSearchSelect"></view>
-<view class="search-panel" wx:if="{{showSearchSelect}}">
-  <view class="search-panel__header">
-    <text class="search-panel__title">选择 {{searchSelectLabel}}</text>
-    <view class="search-panel__close" catchtap="closeSearchSelect">
-      <t-icon name="close" size="40rpx" />
-    </view>
-  </view>
-  <view class="search-panel__search">
-    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
-    <input class="search-panel__input" value="{{searchKeyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onSearchKeywordChange" />
-    <text class="search-panel__clear" wx:if="{{searchKeyword}}" catchtap="clearSearchKeyword">清除</text>
-  </view>
-  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="search-panel__item {{searchSelectValue === item ? 'search-panel__item--selected' : ''}}"
-          wx:for="{{filteredOptions}}" wx:key="*this"
-          data-value="{{item}}" bindtap="selectSearchOption">
-      <text>{{item}}</text>
-      <t-icon wx:if="{{searchSelectValue === item}}" name="check" size="32rpx" style="color:#0052D9;" />
-    </view>
-    <view class="search-panel__empty" wx:if="{{filteredOptions.length === 0}}">
-      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
-      <text wx:if="{{searchSelectOptions.length === 0}}">该字段无配置选项</text>
-      <text wx:else>未找到匹配 "{{searchKeyword}}"</text>
-    </view>
-  </scroll-view>
-</view>
-
-<t-date-time-picker
-  visible="{{datePickerVisible}}"
-  value="{{datePickerValue}}"
-  format="YYYY-MM-DD HH:mm:ss"
-  title="选择日期时间"
-  bind:change="onDatePickerConfirm"
-  bind:cancel="onDatePickerCancel"
+<search-select
+  visible="{{showSearchSelect}}"
+  options="{{searchSelectOptions}}"
+  label="{{searchSelectLabel}}"
+  currentValue="{{searchSelectValue}}"
+  bind:select="onSearchSelect"
+  bind:close="closeSearchSelect"
 />

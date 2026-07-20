@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "Switch",
+  "usingComponents": {
+    "base": "./base",
+    "label": "./label",
+    "color": "./color",
+    "status": "./status",
+    "size": "./size"
+  }
+}

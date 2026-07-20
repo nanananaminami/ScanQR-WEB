@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "生产报表",
+  "usingComponents": {
+    "t-navbar": "tdesign-miniprogram/navbar/navbar",
+    "t-loading": "tdesign-miniprogram/loading/loading",
+    "t-button": "tdesign-miniprogram/button/button",
+    "t-icon": "tdesign-miniprogram/icon/icon",
+    "t-picker": "tdesign-miniprogram/picker/picker"
+  }
+}

@@ -1,5 +1,22 @@
 const auth = require('../../utils/auth');
 
+const CLOUD_BASE = 'https://cloud1-d3gtr9e3m940ddbfb-1453011694.ap-shanghai.app.tcloudbase.com/api';
+
+function callCloud(name, data, noAuth) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: CLOUD_BASE + '/' + name,
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: data || {},
+      success: (res) => {
+        resolve({ result: res.data || {} });
+      },
+      fail: reject
+    });
+  });
+}
+
 Page({
   data: {
     username: '',
@@ -9,7 +26,6 @@ Page({
   },
 
   onLoad() {
-    // 已有会话则尝试恢复，免去重复登录
     const session = auth.getSession();
     if (session && session.session_token) {
       this.tryRestoreSession(session);
@@ -20,29 +36,27 @@ Page({
 
   tryRestoreSession(session) {
     wx.showLoading({ title: '登录中...', mask: true });
-    wx.cloud.callFunction({
-      name: 'getUserRole',
-      data: { session_token: session.session_token }
-    }).then((res) => {
-      wx.hideLoading();
-      const result = res.result || {};
-      if (result.success) {
-        auth.setSession(Object.assign({}, session, {
-          user: result.user,
-          role: result.role,
-          role_id: result.role_id,
-          permissions: result.permissions
-        }));
-        this.redirectAfterLogin();
-      } else {
+    callCloud('getUserRole', { session_token: session.session_token })
+      .then((res) => {
+        wx.hideLoading();
+        const result = res.result || {};
+        if (result.success) {
+          auth.setSession(Object.assign({}, session, {
+            user: result.user,
+            role: result.role,
+            role_id: result.role_id,
+            permissions: result.permissions
+          }));
+          this.redirectAfterLogin();
+        } else {
+          auth.clearSession();
+          this.setData({ showSeedHint: true });
+        }
+      }).catch(() => {
+        wx.hideLoading();
         auth.clearSession();
         this.setData({ showSeedHint: true });
-      }
-    }).catch(() => {
-      wx.hideLoading();
-      auth.clearSession();
-      this.setData({ showSeedHint: true });
-    });
+      });
   },
 
   onUsernameChange(e) {
@@ -62,31 +76,29 @@ Page({
     }
     this.setData({ loading: true });
     wx.showLoading({ title: '登录中...', mask: true });
-    wx.cloud.callFunction({
-      name: 'login',
-      data: { username: username.trim(), password: password }
-    }).then((res) => {
-      wx.hideLoading();
-      this.setData({ loading: false });
-      const result = res.result || {};
-      if (result.success) {
-        auth.setSession({
-          session_token: result.session_token,
-          user: result.user,
-          role: result.role,
-          role_id: result.role_id,
-          permissions: result.permissions
-        });
-        wx.showToast({ title: '登录成功', icon: 'success' });
-        setTimeout(() => this.redirectAfterLogin(), 400);
-      } else {
-        wx.showModal({ title: '登录失败', content: result.msg || '请重试', showCancel: false });
-      }
-    }).catch(() => {
-      wx.hideLoading();
-      this.setData({ loading: false });
-      wx.showModal({ title: '登录失败', content: '请检查 login 云函数是否已部署', showCancel: false });
-    });
+    callCloud('login', { username: username.trim(), password: password })
+      .then((res) => {
+        wx.hideLoading();
+        this.setData({ loading: false });
+        const result = res.result || {};
+        if (result.success) {
+          auth.setSession({
+            session_token: result.session_token,
+            user: result.user,
+            role: result.role,
+            role_id: result.role_id,
+            permissions: result.permissions
+          });
+          wx.showToast({ title: '登录成功', icon: 'success' });
+          setTimeout(() => this.redirectAfterLogin(), 400);
+        } else {
+          wx.showModal({ title: '登录失败', content: result.msg || '请重试', showCancel: false });
+        }
+      }).catch(() => {
+        wx.hideLoading();
+        this.setData({ loading: false });
+        wx.showModal({ title: '登录失败', content: '请检查 login 云函数是否已部署', showCancel: false });
+      });
   },
 
   redirectAfterLogin() {
@@ -105,7 +117,7 @@ Page({
       success: (res) => {
         if (!res.confirm) return;
         wx.showLoading({ title: '初始化中...', mask: true });
-        wx.cloud.callFunction({ name: 'initSeedData' })
+        callCloud('initSeedData')
           .then((r) => {
             wx.hideLoading();
             const result = r.result || {};

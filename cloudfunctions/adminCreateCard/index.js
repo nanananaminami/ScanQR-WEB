@@ -3,42 +3,12 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-async function authenticate(event) {
-  const token = event.session_token;
-  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
-  const sessionRes = await db.collection('sys_sessions').where({
-    session_token: token,
-    expires_at: _.gt(new Date())
-  }).get();
-  if (sessionRes.data.length === 0) {
-    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
-  }
-  const session = sessionRes.data[0];
-  let user = null;
-  try {
-    const userRes = await db.collection('sys_users').doc(session.user_id).get();
-    user = userRes.data;
-  } catch (e) {
-    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
-  }
-  if (!user || user.status === 'disabled') {
-    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
-  }
-  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
-  const role = roleRes.data[0] || null;
-  const permissions = (role && role.permissions) || [];
-  db.collection('sys_sessions').doc(session._id).update({
-    data: { last_active: db.serverDate() }
-  }).catch(() => {});
-  return { ok: true, user, role, role_id: user.role_id, permissions, session };
-}
-
-function escapeRegex(str) {
-  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+const common = require('./common');
+const authenticate = common.makeAuth(db, _);
+const { escapeRegex } = common;
 
 // 构建单道工序的 dynamic_step 结构（嵌套 depts：生产 + 品质）
-function buildDynamicStep(stepName, sort, detailFields) {
+function buildDynamicStep(stepName, sort, detailFields, qcOnlySet) {
   const deptFields = {};
   detailFields.forEach(f => {
     deptFields[f.field_name] = f.default || (f.type === 'number' ? 0 : '');
@@ -46,6 +16,7 @@ function buildDynamicStep(stepName, sort, detailFields) {
   return {
     step_name: stepName,
     sort: sort,
+    step_type: qcOnlySet && qcOnlySet.has(stepName) ? 'qc' : 'prod',
     device_no: '',
     fixture_no: '',
     prod_started_at: null,
@@ -72,6 +43,7 @@ function buildHeaderData(headerFields, submittedHeader) {
 }
 
 exports.main = async (event, context) => {
+  event = common.unwrapHttpEvent(event);
   const { work_order_no, template_id, header_data, steps } = event;
   try {
     const auth = await authenticate(event);
@@ -116,7 +88,16 @@ exports.main = async (event, context) => {
     const headerFields = template.header_fields || [];
 
     const stepNames = steps.filter(s => s && s.trim()).map(s => s.trim());
-    const dynamicSteps = stepNames.map((name, i) => buildDynamicStep(name, i + 1, detailFields));
+
+    const qcOnlySet = new Set();
+    try {
+      const qcDictRes = await db.collection('sys_dicts').where({ dict_id: 'qc_only_steps' }).get();
+      if (qcDictRes.data.length > 0) {
+        (qcDictRes.data[0].options || []).forEach(o => qcOnlySet.add(String(o).trim()));
+      }
+    } catch (e) { /* ignore */ }
+
+    const dynamicSteps = stepNames.map((name, i) => buildDynamicStep(name, i + 1, detailFields, qcOnlySet));
     const builtHeaderData = buildHeaderData(headerFields, header_data || {});
 
     const addRes = await db.collection('process_cards').add({

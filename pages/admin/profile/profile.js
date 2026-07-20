@@ -1,4 +1,5 @@
 const auth = require('../../../utils/auth');
+const { pad, formatDate, formatDateTime } = require('../../../utils/time');
 
 Page({
   data: {
@@ -11,6 +12,7 @@ Page({
   },
 
   onLoad() {
+    if (!auth.requireLogin()) return;
     this.initData();
   },
 
@@ -23,19 +25,8 @@ Page({
   initData() {
     const session = auth.getSession() || {};
     const user = session.user || {};
-    let createdText = '-';
-    if (user.created_at) {
-      const d = new Date(user.created_at);
-      if (!isNaN(d.getTime())) createdText = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-    }
-    let lastLoginText = '-';
-    if (user.last_login) {
-      const d = new Date(user.last_login);
-      if (!isNaN(d.getTime())) {
-        const pad = (n) => (n < 10 ? '0' + n : '' + n);
-        lastLoginText = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-      }
-    }
+    const createdText = formatDate(user.created_at);
+    const lastLoginText = formatDateTime(user.last_login);
     this.setData({
       user,
       roleName: session.role || '',
@@ -68,6 +59,10 @@ Page({
 
   goDicts() {
     wx.navigateTo({ url: '/pages/admin/dicts/dicts' });
+  },
+
+  goReports() {
+    wx.navigateTo({ url: '/pages/admin/reports/reports' });
   },
 
   handleLogout() {

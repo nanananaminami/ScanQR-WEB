@@ -1,0 +1,80 @@
+<t-navbar title="生产报表" />
+
+<view class="reports-page">
+  <view class="reports-filter">
+    <picker mode="date" value="{{dateFrom}}" bindchange="onDateFromChange">
+      <view class="filter-date">
+        <t-icon name="calendar" size="28rpx" style="color:#909399;margin-right:8rpx;" />
+        <text>{{dateFromText}}</text>
+      </view>
+    </picker>
+    <text class="filter-sep">至</text>
+    <picker mode="date" value="{{dateTo}}" bindchange="onDateToChange">
+      <view class="filter-date">
+        <t-icon name="calendar" size="28rpx" style="color:#909399;margin-right:8rpx;" />
+        <text>{{dateToText}}</text>
+      </view>
+    </picker>
+  </view>
+
+  <view class="reports-loading" wx:if="{{loading}}">
+    <t-loading theme="circular" size="40rpx" text="加载中..." />
+  </view>
+
+  <block wx:if="{{!loading}}">
+    <view class="summary-cards">
+      <view class="summary-card summary-card--blue">
+        <view class="summary-card__value">{{summary.totalCreated}}</view>
+        <view class="summary-card__label">新开卡</view>
+      </view>
+      <view class="summary-card summary-card--green">
+        <view class="summary-card__value">{{summary.totalCompleted}}</view>
+        <view class="summary-card__label">已完工</view>
+      </view>
+      <view class="summary-card summary-card--orange">
+        <view class="summary-card__value">{{summary.wipCount}}</view>
+        <view class="summary-card__label">在制中</view>
+      </view>
+      <view class="summary-card summary-card--purple">
+        <view class="summary-card__value">{{summary.totalScans}}</view>
+        <view class="summary-card__label">扫码次数</view>
+      </view>
+    </view>
+
+    <view class="reports-section">
+      <view class="section-title">每日趋势 ({{summary.days}}天)</view>
+      <view class="trend-legend">
+        <view class="legend-item"><view class="legend-dot legend-dot--scan"></view>扫码</view>
+        <view class="legend-item"><view class="legend-dot legend-dot--create"></view>新开</view>
+        <view class="legend-item"><view class="legend-dot legend-dot--complete"></view>完工</view>
+      </view>
+      <view class="trend-chart" wx:if="{{trend.length > 0}}">
+        <view class="trend-row" wx:for="{{trend}}" wx:key="date">
+          <view class="trend-row__date">{{item.date.slice(5)}}</view>
+          <view class="trend-row__bars">
+            <view class="bar bar--scan" style="width: {{item.scans / maxBarValue * 100}}%">{{item.scans > 0 ? item.scans : ''}}</view>
+            <view class="bar bar--create" style="width: {{item.created / maxBarValue * 100}}%">{{item.created > 0 ? item.created : ''}}</view>
+            <view class="bar bar--complete" style="width: {{item.completed / maxBarValue * 100}}%">{{item.completed > 0 ? item.completed : ''}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="trend-empty" wx:else>
+        <t-icon name="chart" size="60rpx" style="color:#c0c4cc;" />
+        <text>暂无数据</text>
+      </view>
+    </view>
+
+    <view class="reports-section" wx:if="{{stepBreakdown.length > 0}}">
+      <view class="section-title">工序在制 (WIP)</view>
+      <view class="step-list">
+        <view class="step-row" wx:for="{{stepBreakdown}}" wx:key="step_name">
+          <text class="step-row__name">{{item.step_name}}</text>
+          <view class="step-row__bar-wrap">
+            <view class="step-row__bar" style="width: {{item.count / stepBreakdown[0].count * 100}}%"></view>
+          </view>
+          <text class="step-row__count">{{item.count}}件</text>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

@@ -65,6 +65,11 @@
       </view>
     </view>
 
+    <view class="db-empty" wx:if="{{!stats.wipByWorkstation.length && !stats.slaBottlenecks.length}}">
+      <t-icon name="chart" size="80rpx" style="color:#c0c4cc;" />
+      <text class="db-empty__text">暂无在制数据，开始扫码报工后这里会显示车间实时动态</text>
+    </view>
+
     <view class="quick-actions">
       <view class="quick-action" bindtap="goScan">
         <t-icon name="scan" size="48rpx" />

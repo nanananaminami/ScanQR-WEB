@@ -15,6 +15,7 @@
     <view class="filter-chip {{statusFilter === 'normal' ? 'filter-chip--active' : ''}}" data-status="normal" bindtap="onFilterChange">正常</view>
     <view class="filter-chip {{statusFilter === 'cancelled' ? 'filter-chip--active' : ''}}" data-status="cancelled" bindtap="onFilterChange">放弃</view>
     <view class="filter-chip {{statusFilter === 'force_unlock' ? 'filter-chip--active' : ''}}" data-status="force_unlock" bindtap="onFilterChange">强制解锁</view>
+    <view class="filter-chip filter-chip--export" bindtap="openExport">导出</view>
   </view>
 
   <view class="logs-loading" wx:if="{{loading}}">
@@ -43,4 +44,34 @@
       <t-empty description="暂无报工日志" />
     </view>
   </block>
+</view>
+
+<!-- 导出浮层 -->
+<view class="logs-export-mask" wx:if="{{showExport}}" bindtap="closeExport"></view>
+<view class="logs-export-panel" wx:if="{{showExport}}">
+  <view class="logs-export-title">导出报工日志</view>
+  <view class="logs-export-form">
+    <view class="form-row">
+      <text class="form-label">起始日期</text>
+      <picker mode="date" value="{{exportDateFrom}}" bindchange="onExportDateFrom">
+        <view class="form-picker">
+          <text class="{{exportDateFrom ? '' : 'form-picker__placeholder'}}">{{exportDateFrom || '不限'}}</text>
+          <t-icon name="calendar" size="32rpx" />
+        </view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="form-label">截止日期</text>
+      <picker mode="date" value="{{exportDateTo}}" bindchange="onExportDateTo">
+        <view class="form-picker">
+          <text class="{{exportDateTo ? '' : 'form-picker__placeholder'}}">{{exportDateTo || '不限'}}</text>
+          <t-icon name="calendar" size="32rpx" />
+        </view>
+      </picker>
+    </view>
+  </view>
+  <view class="logs-export-actions">
+    <t-button theme="default" variant="outline" bind:tap="closeExport">取消</t-button>
+    <t-button theme="primary" bind:tap="doExport" loading="{{exporting}}">导出 CSV</t-button>
+  </view>
 </view>

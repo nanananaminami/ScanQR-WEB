@@ -1,5 +1,6 @@
-// 前端统一鉴权工具：会话缓存、权限判断、带 token 的云函数调用封装
+// 前端统一鉴权工具：会话缓存、权限判断、带 token 的云函数 HTTP 调用封装
 const SESSION_KEY = 'auth_session';
+const CLOUD_BASE = 'https://cloud1-d3gtr9e3m940ddbfb-1453011694.ap-shanghai.app.tcloudbase.com/api';
 
 function getSession() {
   return wx.getStorageSync(SESSION_KEY) || null;
@@ -48,25 +49,43 @@ function requireLogin() {
   return true;
 }
 
-// 封装 callFunction：自动注入 session_token，会话失效时自动跳登录
-function callWithAuth(name, data) {
+// HTTP 直调云函数：自动注入 session_token，会话失效时自动跳登录
+function callCloud(name, data) {
   const token = getToken();
   const payload = Object.assign({}, data || {}, { session_token: token });
-  return wx.cloud.callFunction({ name, data: payload }).then((res) => {
-    const result = res.result || {};
-    if (result.code === 'NO_TOKEN' || result.code === 'SESSION_EXPIRED' || result.code === 'DISABLED' || result.code === 'USER_NOT_FOUND') {
-      clearSession();
-      wx.reLaunch({ url: '/pages/login/login' });
-      throw new Error(result.msg || '登录已失效');
-    }
-    return res;
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: CLOUD_BASE + '/' + name,
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: payload,
+      success: (res) => {
+        const result = res.data || {};
+        if (result.code === 'NO_TOKEN' || result.code === 'SESSION_EXPIRED' || result.code === 'DISABLED' || result.code === 'USER_NOT_FOUND') {
+          clearSession();
+          wx.reLaunch({ url: '/pages/login/login' });
+          reject(new Error(result.msg || '登录已失效'));
+          return;
+        }
+        // 兼容旧格式：调用方使用 res.result 取值
+        resolve({ result: result });
+      },
+      fail: (err) => {
+        reject(err);
+      }
+    });
   });
 }
 
 function logout() {
   const token = getToken();
   if (token) {
-    wx.cloud.callFunction({ name: 'logout', data: { session_token: token } }).catch(() => {});
+    wx.request({
+      url: CLOUD_BASE + '/logout',
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: { session_token: token }
+    }).catch(() => {});
   }
   clearSession();
   wx.reLaunch({ url: '/pages/login/login' });
@@ -80,6 +99,6 @@ module.exports = {
   clearSession,
   hasPerm,
   requireLogin,
-  callWithAuth,
+  callWithAuth: callCloud,
   logout
 };

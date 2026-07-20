@@ -65,13 +65,24 @@
           <text>提交时自动记录</text>
         </view>
       </view>
-      <view wx:if="{{item.type === 'datetime' && item.auto_now === false}}" class="field-datetime">
-        <view class="field-block__label">{{item.displayLabel}}</view>
-        <view class="field-datetime__value field-datetime__value--picker" data-field="{{item.field_name}}" bindtap="openDatePicker">
-          <t-icon name="calendar" size="32rpx" />
-          <text class="{{formData[item.field_name] ? '' : 'field-datetime__placeholder'}}">{{formData[item.field_name] || '点击选择日期时间'}}</text>
+      <picker wx:if="{{item.type === 'datetime' && item.auto_now === false}}" mode="date" value="{{formData[item.field_name]}}" bindchange="onDatePick" data-field="{{item.field_name}}">
+        <view class="field-datetime">
+          <view class="field-block__label">{{item.displayLabel}}</view>
+          <view class="field-datetime__value field-datetime__value--picker">
+            <t-icon name="calendar" size="32rpx" />
+            <text class="{{formData[item.field_name] ? '' : 'field-datetime__placeholder'}}">{{formData[item.field_name] || '点击选择日期'}}</text>
+          </view>
         </view>
-      </view>
+      </picker>
+      <picker wx:if="{{item.type === 'date'}}" mode="date" value="{{formData[item.field_name]}}" bindchange="onDateOnlyPick" data-field="{{item.field_name}}">
+        <view class="field-datetime">
+          <view class="field-block__label">{{item.displayLabel}}</view>
+          <view class="field-datetime__value field-datetime__value--picker">
+            <t-icon name="calendar" size="32rpx" />
+            <text class="{{formData[item.field_name] ? '' : 'field-datetime__placeholder'}}">{{formData[item.field_name] || '点击选择日期'}}</text>
+          </view>
+        </view>
+      </picker>
 
       <!-- 单选（兼容旧模板） -->
       <view wx:if="{{item.type === 'radio'}}" class="field-block">
@@ -115,39 +126,11 @@
   <t-button theme="primary" bind:tap="goScan">去扫码</t-button>
 </view>
 
-<!-- 搜索选择弹层 -->
-<view class="search-mask" wx:if="{{showSearchSelect}}" bindtap="closeSearchSelect"></view>
-<view class="search-panel" wx:if="{{showSearchSelect}}">
-  <view class="search-panel__header">
-    <text class="search-panel__title">选择选项</text>
-    <view class="search-panel__close" catchtap="closeSearchSelect">
-      <t-icon name="close" size="40rpx" />
-    </view>
-  </view>
-  <view class="search-panel__search">
-    <t-icon name="search" size="32rpx" style="color:#909399;margin-right:12rpx;" />
-    <input class="search-panel__input" value="{{searchKeyword}}" placeholder="输入关键词模糊搜索" placeholder-style="color:#c0c4cc" confirm-type="search" bindinput="onSearchKeywordChange" />
-    <text class="search-panel__clear" wx:if="{{searchKeyword}}" catchtap="clearSearchKeyword">清除</text>
-  </view>
-  <scroll-view class="search-panel__list" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="search-panel__item {{searchSelectValue === item ? 'search-panel__item--selected' : ''}}"
-          wx:for="{{filteredOptions}}" wx:key="*this"
-          data-value="{{item}}" bindtap="selectSearchOption">
-      <text>{{item}}</text>
-      <t-icon wx:if="{{searchSelectValue === item}}" name="check" size="32rpx" style="color:#0052D9;" />
-    </view>
-    <view class="search-panel__empty" wx:if="{{filteredOptions.length === 0}}">
-      <t-icon name="info-circle" size="40rpx" style="color:#c0c4cc;" />
-      <text>未找到匹配 "{{searchKeyword}}"</text>
-    </view>
-  </scroll-view>
-</view>
-
-<t-date-time-picker
-  visible="{{datePickerVisible}}"
-  value="{{datePickerValue}}"
-  format="YYYY-MM-DD HH:mm:ss"
-  title="选择日期时间"
-  bind:change="onDatePickerConfirm"
-  bind:cancel="onDatePickerCancel"
+<search-select
+  visible="{{showSearchSelect}}"
+  options="{{searchSelectOptions}}"
+  label="{{searchSelectLabel}}"
+  currentValue="{{searchSelectValue}}"
+  bind:select="onSearchSelect"
+  bind:close="closeSearchSelect"
 />

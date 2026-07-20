@@ -1,4 +1,5 @@
-const auth = require('../utils/auth');
+const auth = require('../../utils/auth');
+const { pad, nowStr } = require('../../utils/time');
 
 Page({
   data: {
@@ -24,6 +25,7 @@ Page({
   },
 
   onLoad(options) {
+    if (!auth.requireLogin()) return;
     const cardNo = options.card_no ? decodeURIComponent(options.card_no) : '';
     const locked = getApp().globalData.lockedCard;
 
@@ -67,22 +69,9 @@ Page({
   },
 
   refetchCard(cardNo) {
-    wx.cloud.database().collection('process_cards').where({ card_no: cardNo }).get()
-      .then((res) => {
-        if (res.data.length > 0) {
-          this.setData({
-            loading: false,
-            cardData: res.data[0],
-            stepName: res.data[0].current_step || ''
-          });
-          wx.showToast({ title: '表单数据已过期，请重新扫码上锁', icon: 'none' });
-        } else {
-          this.setData({ loading: false });
-        }
-      })
-      .catch(() => {
-        this.setData({ loading: false });
-      });
+    this.setData({ loading: false });
+    wx.showToast({ title: '表单数据已过期，请重新扫码上锁', icon: 'none', duration: 2000 });
+    setTimeout(() => wx.switchTab({ url: '/pages/scan/scan' }), 2000);
   },
 
   onInputChange(e) {
@@ -110,21 +99,8 @@ Page({
     this.setData({ showSearchSelect: false });
   },
 
-  onSearchKeywordChange(e) {
-    const keyword = (e.detail.value || '').toLowerCase().trim();
-    const opts = this.data.searchSelectOptions;
-    const filtered = keyword
-      ? opts.filter(o => String(o).toLowerCase().indexOf(keyword) !== -1)
-      : opts;
-    this.setData({ searchKeyword: keyword, filteredOptions: filtered });
-  },
-
-  clearSearchKeyword() {
-    this.setData({ searchKeyword: '', filteredOptions: this.data.searchSelectOptions });
-  },
-
-  selectSearchOption(e) {
-    const value = e.currentTarget.dataset.value;
+  onSearchSelect(e) {
+    const value = e.detail.value;
     const field = this.data.searchSelectField;
     this.setData({
       ['formData.' + field]: value,
@@ -132,34 +108,23 @@ Page({
     });
   },
 
-  openDatePicker(e) {
+  onDateOnlyPick(e) {
     const field = e.currentTarget.dataset.field;
-    this.setData({
-      datePickerVisible: true,
-      datePickerValue: this.data.formData[field] || '',
-      datePickerField: field
-    });
+    this.setData({ ['formData.' + field]: e.detail.value });
   },
 
-  onDatePickerConfirm(e) {
-    const field = this.data.datePickerField;
-    this.setData({
-      ['formData.' + field]: e.detail.value,
-      datePickerVisible: false,
-      datePickerField: ''
-    });
-  },
-
-  onDatePickerCancel() {
-    this.setData({ datePickerVisible: false, datePickerField: '' });
+  onDatePick(e) {
+    const field = e.currentTarget.dataset.field;
+    const date = e.detail.value;
+    const now = new Date();
+    const timeStr = ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    this.setData({ ['formData.' + field]: date + timeStr });
   },
 
   // 为 datetime 字段生成当前时间字符串
   fillDateTime(fields, formData) {
     const result = Object.assign({}, formData);
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    const now = new Date();
-    const timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    const timeStr = nowStr();
     fields.forEach((f) => {
       if (f.type === 'datetime' && f.auto_now !== false) {
         result[f.field_name] = timeStr;

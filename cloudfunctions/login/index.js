@@ -5,9 +5,7 @@ const db = cloud.database();
 
 const SESSION_TTL_HOURS = 24 * 7; // 7 天
 
-function hashPassword(password, salt) {
-  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
-}
+const { hashPassword, unwrapHttpEvent } = require('./common');
 
 function verifyPassword(password, salt, hash) {
   if (!salt || !hash) return false;
@@ -19,6 +17,7 @@ function genToken() {
 }
 
 exports.main = async (event, context) => {
+  event = unwrapHttpEvent(event);
   const { username, password } = event;
   if (!username || !password) {
     return { success: false, code: 'INVALID_PARAMS', msg: '请输入账号和密码' };

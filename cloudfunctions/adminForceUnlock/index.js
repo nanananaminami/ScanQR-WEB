@@ -2,38 +2,11 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
-
-async function authenticate(event) {
-  const token = event.session_token;
-  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
-  const sessionRes = await db.collection('sys_sessions').where({
-    session_token: token,
-    expires_at: _.gt(new Date())
-  }).get();
-  if (sessionRes.data.length === 0) {
-    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
-  }
-  const session = sessionRes.data[0];
-  let user = null;
-  try {
-    const userRes = await db.collection('sys_users').doc(session.user_id).get();
-    user = userRes.data;
-  } catch (e) {
-    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
-  }
-  if (!user || user.status === 'disabled') {
-    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
-  }
-  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
-  const role = roleRes.data[0] || null;
-  const permissions = (role && role.permissions) || [];
-  db.collection('sys_sessions').doc(session._id).update({
-    data: { last_active: db.serverDate() }
-  }).catch(() => {});
-  return { ok: true, user, role, role_id: user.role_id, permissions, session };
-}
+const common = require('./common');
+const authenticate = common.makeAuth(db, _);
 
 exports.main = async (event, context) => {
+  event = common.unwrapHttpEvent(event);
   const { card_id, user_name } = event;
   try {
     const auth = await authenticate(event);

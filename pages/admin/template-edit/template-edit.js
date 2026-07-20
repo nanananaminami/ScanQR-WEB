@@ -5,7 +5,8 @@ const FIELD_TYPES = [
   { type: 'number', name: '数字输入', desc: '数量、良品率等' },
   { type: 'select', name: '下拉选择', desc: '选项列表' },
   { type: 'textarea', name: '文本域', desc: '备注说明' },
-  { type: 'datetime', name: '时间日期', desc: '自动记录或选择时间' }
+  { type: 'datetime', name: '时间日期', desc: '自动记录或选择时间' },
+  { type: 'date', name: '日期', desc: '仅选择日期' }
 ];
 
 const TYPE_NAME_MAP = {};
@@ -60,7 +61,9 @@ Page({
     return auth.callWithAuth('getDictList').then((res) => {
       const result = res.result || {};
       if (result.success) this.setData({ dicts: result.dicts || [] });
-    }).catch(() => {});
+    }).catch(() => {
+      wx.showToast({ title: '字典加载失败', icon: 'none' });
+    });
   },
 
   loadTemplate(template_id) {
@@ -123,6 +126,7 @@ Page({
         const type = FIELD_TYPES[res.tapIndex].type;
         const newField = this.normalizeField({ type });
         if (type === 'datetime') newField.placeholder = '自动记录提交时间';
+    if (type === 'date') newField.placeholder = '选择日期';
         const key = this.getFieldsKey();
         const fields = this.data[key];
         this.setData({ [key]: fields.concat([newField]) });
@@ -139,6 +143,7 @@ Page({
         const key = this.getFieldsKey();
         const field = Object.assign({}, this.data[key][index], { type });
         if (type === 'datetime') field.placeholder = '自动记录提交时间';
+        if (type === 'date') field.placeholder = '选择日期';
         this.setData({ [key + '[' + index + ']']: field });
       }
     });

@@ -1,4 +1,5 @@
 const auth = require('../../../utils/auth');
+const { formatFullDateTime } = require('../../../utils/time');
 
 Page({
   data: {
@@ -59,6 +60,7 @@ Page({
       }
     }).catch(() => {
       this.setData({ loading: false });
+      wx.showToast({ title: '加载失败', icon: 'none' });
     });
   },
 
@@ -100,7 +102,7 @@ Page({
 
     return {
       ...log,
-      timeText: this.formatTime(log.submit_time),
+      timeText: formatFullDateTime(log.submit_time),
       statusText,
       statusType,
       dotType,
@@ -108,11 +110,4 @@ Page({
     };
   },
 
-  formatTime(t) {
-    if (!t) return '-';
-    const d = new Date(t);
-    if (isNaN(d.getTime())) return '-';
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-  }
 });

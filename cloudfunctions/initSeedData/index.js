@@ -1,18 +1,16 @@
 const cloud = require('wx-server-sdk');
-const crypto = require('crypto');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-function hashPassword(password, salt) {
-  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
-}
+const { hashPassword, generateSalt, unwrapHttpEvent } = require('./common');
 
 function buildStep(stepName, sort, detailFields) {
   const step = {
     step_name: stepName, sort,
     device_no: '',
     fixture_no: '',
+    step_type: 'prod',
     prod_started_at: null,
     prod_completed_at: null,
     prod_completed_by: null,
@@ -119,6 +117,7 @@ exports.main = async (event, context) => {
 
   try {
     const userCountRes = await db.collection('sys_users').count();
+    // 已有用户时需认证；系统为空时允许无认证调用
     if (userCountRes.total > 0) {
       const auth = await authenticate(event);
       if (!auth.ok) return { success: false, code: auth.code, msg: auth.msg };
@@ -162,7 +161,7 @@ exports.main = async (event, context) => {
 
     const adminExist = await db.collection('sys_users').where({ username: 'admin' }).get();
     if (adminExist.data.length === 0) {
-      const salt = crypto.randomBytes(16).toString('hex');
+      const salt = generateSalt();
       const hash = hashPassword('admin123', salt);
       await db.collection('sys_users').add({
         data: {
@@ -188,7 +187,8 @@ exports.main = async (event, context) => {
       { dict_id: 'process_type', dict_name: '制程类型', options: ['开始注塑', '保压成型', '冷却定型', '开模取件'] },
       { dict_id: 'defect_reason', dict_name: '不良原因', options: ['气泡', '缺料', '飞边', '变形', '尺寸超差'] },
       { dict_id: 'process_list', dict_name: '工序列表', options: ['压印', '光刻', '镀AR', '镀Ti', '去胶撕膜', '去胶清洗', '切割', '冲压', '折弯', '焊接', '喷涂', '组装', '测试', '车削', '铣削', '磨削', '电镀', '包装', '注塑', 'CNC加工', '抛光', '清洗', '烘干', '打标', '目检', '全检', '成品入库'] },
-      { dict_id: 'department_list', dict_name: '部门列表', options: ['生产部', '品质部', '信息部', '仓储部', '设备部', '工艺部'] }
+      { dict_id: 'department_list', dict_name: '部门列表', options: ['生产部', '品质部', '信息部', '仓储部', '设备部', '工艺部'] },
+      { dict_id: 'qc_only_steps', dict_name: '纯QC工序（不参与生产）', options: ['目检', '全检', '成品入库'] }
     ];
     for (const d of SEED_DICTS) {
       const existDict = await db.collection('sys_dicts').where({ dict_id: d.dict_id }).get();
@@ -270,7 +270,7 @@ exports.main = async (event, context) => {
     for (const u of SEED_TEST_USERS) {
       const existUser = await db.collection('sys_users').where({ username: u.username }).get();
       if (existUser.data.length === 0) {
-        const salt = crypto.randomBytes(16).toString('hex');
+        const salt = generateSalt();
         const hash = hashPassword(u.password, salt);
         await db.collection('sys_users').add({
           data: {
@@ -312,7 +312,7 @@ exports.main = async (event, context) => {
       header_data: { project_name: '测试项目-SLA验证', order_date: '2026-07-16' },
       dynamic_steps: [
         {
-          step_name: '压印', sort: 1, device_no: '', fixture_no: '',
+          step_name: '压印', sort: 1, step_type: 'prod', device_no: '', fixture_no: '',
           prod_started_at: oneHourStr,
           prod_completed_at: halfHourStr,
           prod_completed_by: '张三山',
@@ -324,7 +324,7 @@ exports.main = async (event, context) => {
           ]
         },
         {
-          step_name: '光刻', sort: 2, device_no: '', fixture_no: '',
+          step_name: '光刻', sort: 2, step_type: 'prod', device_no: '', fixture_no: '',
           prod_started_at: nowStr,
           prod_completed_at: null,
           prod_completed_by: null,
@@ -336,7 +336,7 @@ exports.main = async (event, context) => {
           ]
         },
         {
-          step_name: '镀AR', sort: 3, device_no: '', fixture_no: '',
+          step_name: '目检', sort: 3, step_type: 'qc', device_no: '', fixture_no: '',
           prod_started_at: null,
           prod_completed_at: null,
           prod_completed_by: null,
@@ -348,7 +348,7 @@ exports.main = async (event, context) => {
           ]
         },
         {
-          step_name: '镀Ti', sort: 4, device_no: '', fixture_no: '',
+          step_name: '全检', sort: 4, step_type: 'qc', device_no: '', fixture_no: '',
           prod_started_at: null,
           prod_completed_at: null,
           prod_completed_by: null,

@@ -43,6 +43,7 @@ Page({
       }
     }).catch(() => {
       this.setData({ loading: false });
+      wx.showToast({ title: '加载失败', icon: 'none' });
     });
   },
 

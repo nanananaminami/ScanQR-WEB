@@ -1,4 +1,5 @@
 const auth = require('../../../utils/auth');
+const { formatDateTime } = require('../../../utils/time');
 
 Page({
   data: {
@@ -8,7 +9,12 @@ Page({
     statusFilter: 'all',
     page: 1,
     hasMore: false,
-    loadingMore: false
+    loadingMore: false,
+    // 导出
+    showExport: false,
+    exportDateFrom: '',
+    exportDateTo: '',
+    exporting: false
   },
 
   onLoad() {
@@ -61,6 +67,7 @@ Page({
       }
     }).catch(() => {
       this.setData({ loading: false, loadingMore: false });
+      wx.showToast({ title: '加载失败', icon: 'none' });
     });
   },
 
@@ -92,20 +99,14 @@ Page({
     return {
       ...log,
       cardNoDisplay: log.order_no || log.card_no || '-',
-      timeText: this.formatTime(log.submit_time),
+      timeText: formatDateTime(log.submit_time),
       statusText,
       statusType,
       formSummary
     };
   },
 
-  formatTime(t) {
-    if (!t) return '-';
-    const d = new Date(t);
-    if (isNaN(d.getTime())) return '-';
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-  },
+
 
   onSearchChange(e) {
     this.setData({ keyword: e.detail.value || '' });
@@ -139,5 +140,71 @@ Page({
   onPullDownRefresh() {
     this.loadLogs(true);
     wx.stopPullDownRefresh();
+  },
+
+  openExport() {
+    this.setData({ showExport: true });
+  },
+
+  closeExport() {
+    this.setData({ showExport: false });
+  },
+
+  onExportDateFrom(e) {
+    this.setData({ exportDateFrom: e.detail.value });
+  },
+
+  onExportDateTo(e) {
+    this.setData({ exportDateTo: e.detail.value });
+  },
+
+  doExport() {
+    if (this.data.exporting) return;
+    this.setData({ exporting: true });
+    wx.showLoading({ title: '导出中...' });
+
+    const { keyword, statusFilter, exportDateFrom, exportDateTo } = this.data;
+    auth.callWithAuth('exportLogs', {
+      keyword: keyword || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      date_from: exportDateFrom || undefined,
+      date_to: exportDateTo || undefined
+    }).then((res) => {
+      wx.hideLoading();
+      this.setData({ exporting: false, showExport: false });
+      const result = res.result || {};
+      if (result.success && result.downloadUrl) {
+        const url = result.downloadUrl;
+        wx.setClipboardData({ data: url });
+        wx.showModal({
+          title: '导出成功',
+          content: '共导出 ' + result.total + ' 条记录。链接已复制到剪贴板。',
+          confirmText: '打开文件',
+          cancelText: '关闭',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              wx.downloadFile({
+                url: url,
+                success: (dfRes) => {
+                  wx.openDocument({
+                    filePath: dfRes.tempFilePath,
+                    fileType: 'csv',
+                    showMenu: true,
+                    fail: () => wx.showToast({ title: '请用 WPS 等应用打开', icon: 'none' })
+                  });
+                },
+                fail: () => wx.showToast({ title: '下载失败', icon: 'none' })
+              });
+            }
+          }
+        });
+      } else {
+        wx.showToast({ title: result.msg || '导出失败', icon: 'none' });
+      }
+    }).catch(() => {
+      wx.hideLoading();
+      this.setData({ exporting: false });
+      wx.showToast({ title: '导出失败', icon: 'none' });
+    });
   }
 });

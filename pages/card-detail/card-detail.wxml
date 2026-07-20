@@ -39,21 +39,25 @@
       <view class="cd-step__title">
         <text>工序 {{mainIndex + 1}}：{{item.step_name}}</text>
         <view class="cd-step__status-tags">
-          <view wx:if="{{item.prod_completed_at}}" class="cd-step__tag cd-step__tag--prod">生产已完成</view>
+          <view wx:if="{{item.step_type === 'qc'}}" class="cd-step__tag cd-step__tag--qcskip">纯QC</view>
+          <view wx:elif="{{item.prod_completed_at}}" class="cd-step__tag cd-step__tag--prod">生产已完成</view>
           <view wx:elif="{{item.prod_started_at}}" class="cd-step__tag cd-step__tag--wip">生产中</view>
           <view wx:else class="cd-step__tag cd-step__tag--wait">未开始</view>
           <view wx:if="{{item.qc_completed_at}}" class="cd-step__tag cd-step__tag--qc">品质已完成</view>
         </view>
       </view>
 
-      <view wx:if="{{item.prod_completed_by}}" class="cd-step__info">
+      <view wx:if="{{item.step_type === 'qc'}}" class="cd-step__info">
+        纯QC工序，无需生产填报
+      </view>
+      <view wx:elif="{{item.prod_completed_by}}" class="cd-step__info">
         生产完成人：{{item.prod_completed_by}} · {{item.prod_completed_at}}
       </view>
       <view wx:if="{{item.qc_completed_by}}" class="cd-step__info">
         品质完成人：{{item.qc_completed_by}} · {{item.qc_completed_at}}
       </view>
 
-      <view wx:if="{{mainIndex > 0 && dynamicSteps[mainIndex - 1].prod_completed_at && item.prod_started_at}}" class="cd-sla">
+      <view wx:if="{{mainIndex > 0 && dynamicSteps[mainIndex - 1].prod_completed_at && item.prod_started_at && item.step_type !== 'qc'}}" class="cd-sla">
         等待时长（自「{{dynamicSteps[mainIndex - 1].step_name}}」完成起）：
         <text wx:if="{{item.prod_started_at}}" class="cd-sla__value">
           {{dynamicSteps[mainIndex - 1].prod_completed_at + ' ~ ' + item.prod_started_at}}

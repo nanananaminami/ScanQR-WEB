@@ -2,36 +2,8 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
-
-async function authenticate(event) {
-  const token = event.session_token;
-  if (!token) return { ok: false, code: 'NO_TOKEN', msg: '未登录，请先登录' };
-  const sessionRes = await db.collection('sys_sessions').where({
-    session_token: token,
-    expires_at: _.gt(new Date())
-  }).get();
-  if (sessionRes.data.length === 0) {
-    return { ok: false, code: 'SESSION_EXPIRED', msg: '会话已过期，请重新登录' };
-  }
-  const session = sessionRes.data[0];
-  let user = null;
-  try {
-    const userRes = await db.collection('sys_users').doc(session.user_id).get();
-    user = userRes.data;
-  } catch (e) {
-    return { ok: false, code: 'USER_NOT_FOUND', msg: '用户不存在' };
-  }
-  if (!user || user.status === 'disabled') {
-    return { ok: false, code: 'DISABLED', msg: '账号已被禁用' };
-  }
-  const roleRes = await db.collection('sys_roles').where({ role_id: user.role_id }).get();
-  const role = roleRes.data[0] || null;
-  const permissions = (role && role.permissions) || [];
-  db.collection('sys_sessions').doc(session._id).update({
-    data: { last_active: db.serverDate() }
-  }).catch(() => {});
-  return { ok: true, user, role, role_id: user.role_id, permissions, session };
-}
+const common = require('./common');
+const authenticate = common.makeAuth(db, _);
 
 function collectChanges(oldSteps, newSteps, detailFields) {
   const changes = [];
@@ -78,6 +50,7 @@ function collectChanges(oldSteps, newSteps, detailFields) {
 }
 
 exports.main = async (event, context) => {
+  event = common.unwrapHttpEvent(event);
   const { order_no, card_id, dynamic_steps, header_data, operator_name,
           matched_steps, step_index, dept_type, warehouse_personnel, warehouse_date, cancelled } = event;
   try {
@@ -136,7 +109,10 @@ exports.main = async (event, context) => {
           const currentStep = steps[si];
           if (!currentStep) continue;
 
+          const isQcOnly = currentStep.step_type === 'qc';
+
           if (dt === '生产') {
+            if (isQcOnly) continue;
             if (si > 0 && !steps[si - 1].prod_completed_at) {
               gateBlocked = true;
               gateMsg = '上一道工序「' + steps[si - 1].step_name + '」生产未完成';
@@ -152,7 +128,7 @@ exports.main = async (event, context) => {
         }
 
         if (!gateBlocked) {
-          const nextIndex = steps.findIndex((s, i) => i >= 0 && !s.prod_completed_at);
+          const nextIndex = steps.findIndex((s, i) => i >= 0 && !s.prod_completed_at && !(s.step_type === 'qc'));
           if (nextIndex !== -1) {
             updateData.current_step = steps[nextIndex].step_name;
             updateData.current_step_index = nextIndex;
@@ -173,7 +149,7 @@ exports.main = async (event, context) => {
                 prev_step_name: prevStep.step_name,
                 prev_completed_at: prevStep.prod_completed_at,
                 started_at: currentStep.prod_started_at || nowStr,
-                wait_minutes: Math.floor((now.getTime() - prevCompleted.getTime()) / 60000)
+                wait_minutes: Math.floor((now.getTime() - new Date(prevStep.prod_completed_at).getTime()) / 60000)
               };
             } else {
               gateBlocked = true;
@@ -205,7 +181,7 @@ exports.main = async (event, context) => {
       if ((warehouse_personnel || warehouse_date) && !gateBlocked) {
         const steps = Array.isArray(dynamic_steps) ? dynamic_steps : oldSteps;
         const missingQC = steps.filter(s => s.step_name && !s.qc_completed_at);
-        const missingProd = steps.filter(s => s.step_name && !s.prod_completed_at);
+        const missingProd = steps.filter(s => s.step_name && !s.prod_completed_at && !(s.step_type === 'qc'));
 
         if (missingQC.length > 0 || missingProd.length > 0) {
           const reasons = [];

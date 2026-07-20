@@ -1,4 +1,5 @@
 const auth = require('../../../utils/auth');
+const { formatDate } = require('../../../utils/time');
 
 Page({
   data: {
@@ -71,20 +72,12 @@ Page({
     const ws = u.workstation || [];
     const wsText = Array.isArray(ws) ? ws.join('、') : ws;
     return Object.assign({}, u, {
-      createdText: this.formatDate(u.created_at),
-      lastLoginText: this.formatDate(u.last_login),
+      createdText: formatDate(u.created_at),
+      lastLoginText: formatDate(u.last_login),
       statusText: u.status === 'disabled' ? '已禁用' : '正常',
       statusTheme: u.status === 'disabled' ? 'danger' : 'success',
       workstationText: wsText || '-'
     });
-  },
-
-  formatDate(t) {
-    if (!t) return '-';
-    const d = new Date(t);
-    if (isNaN(d.getTime())) return '-';
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   },
 
   onFilterChange(e) {

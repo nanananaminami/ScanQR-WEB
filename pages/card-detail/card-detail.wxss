@@ -98,6 +98,7 @@
 .cd-step__tag--wip { background: rgba(227, 115, 24, 0.1); color: #e37318; }
 .cd-step__tag--wait { background: rgba(144, 147, 153, 0.1); color: #909399; }
 .cd-step__tag--qc { background: rgba(0, 168, 112, 0.1); color: #00a870; }
+.cd-step__tag--qcskip { background: rgba(0, 168, 112, 0.12); color: #00a870; font-weight: 600; }
 
 .cd-step__info {
   font-size: 22rpx;
